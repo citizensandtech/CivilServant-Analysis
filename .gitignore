@@ -1,3 +1,9 @@
+# Project specific ignores
+jupyter_notebook_config.py
+private_data/*
+outputs/*
+praw.ini
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
