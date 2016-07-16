@@ -1,0 +1,514 @@
+---
+title: "r/science Experiment Modeling Strategies Report"
+author: J. Nathan Matias
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+    html_document:
+        toc: true
+        depth: 4  # upto four depths of headings (specified by #, ## and ###)
+        number_sections: false  ## if you want number sections at each table header
+        theme: spacelab  # many options for theme, this one is my favorite.
+        highlight: tango  # specifies the syntax highlighting style
+        code_folding: hide
+---
+
+```{r analysis, include=FALSE, cache=TRUE, cache.extra=file.info('../experiment.planning.07.15.2016.RData')}
+knitr::opts_chunk$set(echo=TRUE)
+load('../experiment.planning.07.15.2016.RData')
+library(texreg)
+library(ggplot2)
+library(pscl)
+library(lubridate)
+library(stargazer)
+library(pscl)
+library(lme4)
+library(lmerTest)
+```
+
+What intervention should r/science try first, and what kind of analysis should we choose? In the initial proposal, I suggested that we alternate showing and hiding the rules message showed underneath the comment box to every commenter on the Desktop version of reddit ([experiment pre-registration here](https://osf.io/knb48/)). r/science moderators were concerned about two things:
+
+* the fact that mobile users did not see this message
+* the possibility that the pre-registered design was not using the appropriate covariates
+
+In its place, some moderators suggested the following alternative:
+
+* randomly assign a sticky comment (which would be seen by all users)
+* consider a greater variety of covariates, alongside a greater variety of analysis strategies
+
+Both of these ideas are fine experiments, and ***we should try them both***. In this report, I explore the evidence and arguments in favor of each of these two possibilities in order to suggest which intervention to attempt first.
+
+**Recommendation**: **Start with the Sticky Comment experiment, which we can run for a shorter period of time.** Then we can try the CSS experiment. That might even buy us enough time to convince reddit to allow us to show a comment rule message to mobile users.
+
+## Data Collection
+This analysis is based on the following sources:
+
+* A 28 day record from reddit on the user agent of r/science commenters ([notebook here](https://github.com/c4fcm/CivilServant-Analysis/blob/master/User%20Agent%20Analysis%2C%20July%208%2C%202016.ipynb))
+* Comments Datasets:
+    + A longer prepared dataset of comments from *`r min(full.comments$datetime)`* to *`r max(full.comments$datetime)`* ([notebook here](https://github.com/c4fcm/CivilServant-Analysis/blob/master/Summary%20Analysis%20of%20r-science.ipynb))
+    + A shorter prepared dataset of comments from *`r min(short.comments$datetime)`* to *`r max(short.comments$datetime)`* with covariates for time spent in the top 10 of TOP posts in r/science ([notebook here](https://github.com/c4fcm/CivilServant-Analysis/blob/master/Front%20Page%20R%20Science%20Data%20Creation.ipynb))
+* Posts Datasets
+    + A longer prepared dataset of posts from *`r min(full.posts$datetime)`* to *`r max(full.posts$datetime)`* ([notebook here](https://github.com/c4fcm/CivilServant-Analysis/blob/master/Summary%20Analysis%20of%20r-science.ipynb))
+    + A shorterprepared dataset of posts from *`r min(short.posts$datetime)`* to *`r max(short.posts$datetime)`* with covariates for time spent in the top 10 of TOP posts in r/science ([notebook here](https://github.com/c4fcm/CivilServant-Analysis/blob/master/Front%20Page%20R%20Science%20Data%20Creation.ipynb))
+
+## Newcomer Comments and Removed Newcomer Comments
+The proposed experiments focus on the behavior of newcomers. For that reason, it's important to look at how many newcomers participate in the subreddit over time, how many newcomer comments there are, and how many of those comments are removed. As seen in the [summary analysis of r/science](https://github.com/c4fcm/CivilServant-Analysis/blob/master/Summary%20Analysis%20of%20r-science.ipynb) from April 4, 2016 to May June 30, 2016, there were:
+
+
+* 75563 comments by newcomers
+* 36458 comments by newcomers that were removed
+* 6669 comments by newcomers that were removed, whose accounts were not later deleted
+
+In other words, over half of all comments by newcomers are removed. Despite this, an overwhelming majority of newcomers whose reddit accounts still exist up to 3 months later **do not make comments that are removed**. Of accounts that still exist between 2 weeks to three months later, only 8.8% of newcomer comments are removed. 
+
+Why are so many newcomer comments made by accounts that no longer exist in up to 3 months?
+
+* most removed comments might be made by throwaway, spammer accounts
+* people who experience removals might create new reddit accounts to come back with a fresh identity
+
+What does this mean for the experiment?
+
+* it's possible that methods used by r/science to notify the community about social norms are highly effective at explaining to users how to behave (more likely)
+* it's possible that the reddit users who arrive at r/science are extremely polite and extremely motivated to make scientific comments on their own, without any knowledge of the rules (less likely)
+
+## Commenters on Mobile, and Desktop Environments
+An employee of reddit supplied aggregate data of user-agents from a 28 day period. Analyzing that data ([code here](https://github.com/c4fcm/CivilServant-Analysis/blob/master/User%20Agent%20Analysis%2C%20July%208%2C%202016.ipynb)), we see the following:
+
+* Unique Commenters
+    + Desktop Web: 54% of Unique Commenters
+    + Mobile Web: 8.2% of Unique Commenters
+    + App: 38% of Unique Commenters
+
+* Total Comments
+    + Desktop Web: 58% of Total Comments
+    + Mobile Web: 9.4% of Total Comments
+    + App: 32% of Total Comments
+
+How much does this matter? Any model that fits a logistic regression to predict the chance of a *specific* comment to be removed would need to control for whether the participant received the intervention. However, any model that looks at the average treatment effect on an aggregate count of comments would not be affected, assuming that the percentage of desktop users is roughly constant between treatment and control conditions.
+
+These findings do however offer more context on the comparative *strength* of the two interventions: the comment-box rules (which are only seen on desktop) versus the sticky comments (which are less prominent but plausibly seen by everyone).
+
+## Intervention A: Altering Comment Box Rules By Day
+In this approach, we alter the comment box rules every 24 hours. In this experiment design, the dependent variable only includes comments made within the eperiment period.
+
+This intervention can be applied automatically by the CivilServant bot at a pre-set time.
+
+### What is the best time to deploy time-randomized interventions?
+I propose to deploy time-randomized interventions at the moment in the day with the fewest number of comments: 10am UTC (6am EDT).
+
+```{r fig.width=7, fig.height=2, echo=FALSE}
+ggplot(full.comments, aes(hour)) +
+  ggtitle("Comments Per Hour (UTC), April 4 2016 - May 30 2016") +
+  geom_histogram(bins=24)
+```
+
+### What percentage of dependent variable observations fall within the experiment period? 
+As you can see, the great majority of newcomer comments and removed newcomer comments are made in the period between the moment that the toplevel post is submitted and the end of the 24 hour experiment period (10am UTC).
+
+```{r fig.width=7, fig.height=3, echo=FALSE}
+ggplot(subset(full.posts, newcomer.comments > 0), aes(newcomer.comments.experiment.day.pct)) +
+  ggtitle(expression(atop("Percent Comments Within Day-Randomized Experiment Period April 4 2016 - May 30 2016", atop(italic("Within the subset of posts with at least 1 newcomer comment"))))) +
+  theme(axis.text.x = element_text(angle=-45, hjust=0, vjust=1), 
+        #plot.margin = unit(c(1.5, 1, 1, 1), "cm"), 
+        plot.title = element_text(size = 10, face = "bold", colour = "black", vjust = -1)) +
+  geom_histogram(bins=100) 
+```
+```{r fig.width=7, fig.height=3, echo=FALSE}
+ggplot(subset(full.posts, newcomer.comments > 0), aes(newcomer.comments.removed.experiment.day.pct)) +
+  ggtitle(expression(atop("Percent Removed Comments Within Day-Randomized Experiment Period April 4 2016 - May 30 2016", atop(italic("Within the subset of posts with at least 1 newcomer comment"))))) +
+  theme(axis.text.x = element_text(angle=-45, hjust=0, vjust=1), 
+        #plot.margin = unit(c(1.5, 1, 1, 1), "cm"), 
+        plot.title = element_text(size = 10, face = "bold", colour = "black", vjust = -1)) +
+  geom_histogram(bins=100)
+  ```
+
+### How should the dependent variables be modeled?
+The two dependent variables in this experiment are:
+
+* *newcomer.comments.removed.experiment.day*: within a post, the number of removed comments by newcomers within the treatment period
+* *newcomer.comments.experiment.day*: within a post, the number of comemnts by newcomers within the treatment period
+
+#### Modeling DV: newcomer.comments.removed.experiment.day
+
+**How should we model this?** We should use a zero-inflated negative binomial model, since there are a large number of zeroes in the data.
+
+First consider the experiment-period removed comment count for all posts:
+```{r, fig.width=7, fig.height=2, echo=TRUE}
+ggplot(short.posts, aes(newcomer.comments.removed.experiment.day)) +
+  ggtitle("Experiment Period Newcomer Comments Removed Per Post, July 4 - 14 2016") +
+  geom_histogram(bins=100)
+```
+
+The number of newcomer removed comments is much lower when we consider whether a post was allowed to be visible or not. Here's the dependent variable for posts that moderators allowed to remain.
+
+```{r, fig.width=7, fig.height=2, echo=TRUE}
+ggplot(subset(short.posts, visible=="True"), aes(newcomer.comments.removed.experiment.day)) +
+  ggtitle("Experiment Period Newcomer Comments Removed Per Visible Post, July 4 - 14 2016") +
+  geom_histogram(bins=100)
+```
+
+Just how many zeroes are there? First, the number of zeroes across all posts.
+```{r, echo=TRUE}
+summary(short.posts$newcomer.comments.removed.experiment.day.zero)
+```
+
+Next, the number of zeroes across all posts that were allowed to be visible.
+```{r, echo=TRUE}
+summary(subset(short.posts, visible=="True")$newcomer.comments.removed.experiment.day.zero)
+```
+##### Logistic Regression for Modeling Zeroes in newcomer.comments.removed.experiment.day
+
+**Covariate decision for zero prediction **: visible + post.sub.top.minutes
+
+```{r, echo=TRUE, results='asis'}
+
+ncrmexz1 <- glm(newcomer.comments.removed.experiment.day.zero ~ 1, data=short.posts, family=binomial)
+ncrmexz2 <- glm(newcomer.comments.removed.experiment.day.zero ~ visible, data=short.posts, family=binomial)
+ncrmexz3 <- glm(newcomer.comments.removed.experiment.day.zero ~ visible + post.sub.top.minutes, data=short.posts, family=binomial)
+ncrmexz4 <- glm(newcomer.comments.removed.experiment.day.zero ~ visible + post.sub.top.minutes + post.ama, data=short.posts, family=binomial)
+ncrmexz5 <- glm(newcomer.comments.removed.experiment.day.zero ~ visible + post.sub.top.minutes + experiment.day.minutes, data=short.posts, family=binomial)
+ncrmexz6 <- glm(newcomer.comments.removed.experiment.day.zero ~ visible + post.sub.top.minutes + post.hour + I(post.hour^2), data=short.posts, family=binomial)
+ncrmexz7 <- glm(newcomer.comments.removed.experiment.day.zero ~ visible + post.sub.top.minutes + weekend, data=short.posts, family=binomial)
+ncrmexz8 <- glm(newcomer.comments.removed.experiment.day.zero ~ visible + post.sub.top.minutes + post.flair, data=short.posts, family=binomial)
+
+htmlreg(list(ncrmexz1, ncrmexz2, ncrmexz3, ncrmexz4, ncrmexz5, ncrmexz6, ncrmexz7, ncrmexz8))
+```
+##### Zero Inflated Negative Binomial Regression for Modeling Zeroes in newcomer.comments.removed.experiment.day
+
+**Covariate decision**: visible + post.ama +  post.sub.top.minutes + experiment.day.minutes + weekend + post.flair + post.hour + I(post.hour^2)
+
+
+```{r, echo=TRUE,results='asis'}
+model.newcomer.comments.rm.exp.zi.1 <- zeroinfl(newcomer.comments.removed.experiment.day ~ 1 | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+model.newcomer.comments.rm.exp.zi.2 <- zeroinfl(newcomer.comments.removed.experiment.day ~ visible | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+model.newcomer.comments.rm.exp.zi.3 <- zeroinfl(newcomer.comments.removed.experiment.day ~ visible +  post.ama | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+model.newcomer.comments.rm.exp.zi.4 <- zeroinfl(newcomer.comments.removed.experiment.day ~ visible + post.ama +  post.sub.top.minutes | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+
+model.newcomer.comments.rm.exp.zi.5 <- zeroinfl(newcomer.comments.removed.experiment.day ~ visible + post.ama +  post.sub.top.minutes + experiment.day.minutes | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+
+model.newcomer.comments.rm.exp.zi.6 <- zeroinfl(newcomer.comments.removed.experiment.day ~ visible + post.ama +  post.sub.top.minutes + experiment.day.minutes + weekend | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+
+model.newcomer.comments.rm.exp.zi.7 <- zeroinfl(newcomer.comments.removed.experiment.day ~ visible + post.ama +  post.sub.top.minutes + experiment.day.minutes + weekend + post.flair | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+model.newcomer.comments.rm.exp.zi.8 <- zeroinfl(newcomer.comments.removed.experiment.day ~ visible + post.ama +  post.sub.top.minutes + experiment.day.minutes + weekend + post.flair + post.hour + I(post.hour^2) | 
+                                                  visible + post.sub.top.minutes, 
+                                                data=short.posts)
+
+htmlreg(list(model.newcomer.comments.rm.exp.zi.1,
+          model.newcomer.comments.rm.exp.zi.2,
+          model.newcomer.comments.rm.exp.zi.3,          
+          model.newcomer.comments.rm.exp.zi.4,          
+          model.newcomer.comments.rm.exp.zi.5,
+          model.newcomer.comments.rm.exp.zi.6,
+          model.newcomer.comments.rm.exp.zi.7,
+          model.newcomer.comments.rm.exp.zi.8))
+```
+
+#### Modeling DV: newcomer.comments.experiment.day
+
+**How should we model this?** We should use a zero-inflated negative binomial model, since there are a large number of zeroes in the data.
+
+First consider the experiment-period comment count for all posts:
+
+```{r, fig.width=7, fig.height=2, echo=FALSE}
+ggplot(short.posts, aes(newcomer.comments.experiment.day)) +
+  ggtitle("Experiment Period Newcomer Comments Per Post, July 4 - 14 2016") +
+  geom_histogram(bins=100)
+```
+
+The number of newcomer comments is much lower when we consider whether a post was allowed to be visible or not. Here's the dependent variable for posts that moderators allowed to remain.
+```{r, fig.width=7, fig.height=2, echo=FALSE}
+ggplot(subset(short.posts, visible=="True"), aes(newcomer.comments.experiment.day)) +
+  ggtitle("Experiment Period Newcomer Comments Per Visible Post, July 4 - 14 2016") +
+  geom_histogram(bins=100)
+```
+
+Just how many zeroes are there? First, the number of zeroes across all posts.
+```{r, echo=TRUE}
+summary(short.posts$newcomer.comments.experiment.day.zero)
+```
+
+Next, the number of zeroes across all posts that were allowed to be visible.
+```{r, echo=TRUE}
+summary(subset(short.posts, visible=="True")$newcomer.comments.experiment.day.zero)
+```
+
+##### Logistic Regression for Modeling Zeroes in newcomer.comments.removed.experiment.day
+
+**Covariate decision for zero prediction **: visible + post.sub.top.minutes
+
+```{r, echo=TRUE,results='asis'}
+ncexz1 <- glm(newcomer.comments.experiment.day.zero ~ 1, data=short.posts, family=binomial)
+ncexz2 <- glm(newcomer.comments.experiment.day.zero ~ visible, data=short.posts, family=binomial)
+ncexz3 <- glm(newcomer.comments.experiment.day.zero ~ visible + post.sub.top.minutes, data=short.posts, family=binomial)
+ncexz4 <- glm(newcomer.comments.experiment.day.zero ~ visible + post.sub.top.minutes + post.ama, data=short.posts, family=binomial)
+ncexz5 <- glm(newcomer.comments.experiment.day.zero ~ visible + post.sub.top.minutes + experiment.day.minutes, data=short.posts, family=binomial)
+ncexz6 <- glm(newcomer.comments.experiment.day.zero ~ visible + post.sub.top.minutes + post.hour + I(post.hour^2), data=short.posts, family=binomial)
+ncexz7 <- glm(newcomer.comments.experiment.day.zero ~ visible + post.sub.top.minutes + weekend, data=short.posts, family=binomial)
+ncexz8 <- glm(newcomer.comments.experiment.day.zero ~ visible + post.sub.top.minutes + post.flair, data=short.posts, family=binomial)
+
+htmlreg(list(ncexz1, ncexz2, ncexz3, ncexz4, ncexz5, ncexz6, ncexz7, ncexz8))
+```
+
+##### Zero Inflated Negative Binomial Regression for Modeling Zeroes in newcomer.comments.experiment.day
+
+**Covariate decision**: visible + post.ama +  post.sub.top.minutes + experiment.day.minutes + weekend + post.flair
+
+```{r, echo=TRUE,results='asis'}
+model.newcomer.comments.exp.zi.1 <- zeroinfl(newcomer.comments.experiment.day ~ 1 | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.exp.zi.2 <- zeroinfl(newcomer.comments.experiment.day ~ visible | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.exp.zi.3 <- zeroinfl(newcomer.comments.experiment.day ~ visible + post.ama| 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.exp.zi.4 <- zeroinfl(newcomer.comments.experiment.day ~ visible + post.ama + post.sub.top.minutes | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.exp.zi.5 <- zeroinfl(newcomer.comments.experiment.day ~ visible + post.ama + post.sub.top.minutes + experiment.day.minutes | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.exp.zi.6 <- zeroinfl(newcomer.comments.experiment.day ~ visible + post.ama + post.sub.top.minutes + experiment.day.minutes + post.hour + I(post.hour^2)  | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.exp.zi.7 <- zeroinfl(newcomer.comments.experiment.day ~ visible + post.ama + post.sub.top.minutes + experiment.day.minutes + post.hour + I(post.hour^2) + weekend | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.exp.zi.8 <- zeroinfl(newcomer.comments.experiment.day ~ visible + post.ama + post.sub.top.minutes + experiment.day.minutes + post.hour + I(post.hour^2) + weekend + post.flair| 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+
+htmlreg(list(model.newcomer.comments.exp.zi.1,
+          model.newcomer.comments.exp.zi.2,
+          model.newcomer.comments.exp.zi.3,
+          model.newcomer.comments.exp.zi.4,
+          model.newcomer.comments.exp.zi.5,
+          model.newcomer.comments.exp.zi.6,
+          model.newcomer.comments.exp.zi.7,
+          model.newcomer.comments.exp.zi.8))
+```
+
+
+## Intervention B: Alternating Sticky Comments
+In this experiment design, we randomly assign a sticky comment with the rules to top-level posts. This intervention can be applied automatically by the CivilServant bot, which could randomly apply sticky comments to posts.
+
+### How should post-level dependent variables be modeled?
+The two dependent variables in this experiment are:
+
+* *newcomer.comments.removed*: within a post, the number of removed newcomer comments
+* *newcomer.comments*: within a post, the number of newcomer comments
+
+
+#### Modeling DV: newcomer.comments.removed
+
+**How should we model this?** We should use a zero-inflated negative binomial model, since there are a large number of zeroes in the data.
+
+
+First consider the count of comments removed for all posts:
+
+```{r, fig.width=7, fig.height=2, echo=FALSE}
+ggplot(short.posts, aes(newcomer.comments.removed)) +
+  ggtitle("Removed Newcomer Comments Per Post, July 4 - 14 2016") +
+  geom_histogram(bins=100)
+```
+
+The number of newcomer comments removed is much lower when we consider whether a post was allowed to be visible or not. Here's the dependent variable for posts that moderators allowed to remain.
+```{r, fig.width=7, fig.height=2, echo=FALSE}
+ggplot(subset(short.posts, visible=="True"), aes(newcomer.comments.removed)) +
+  ggtitle("Removed Newcomer Comments Per Visible Post, July 4 - 14 2016") +
+  geom_histogram(bins=100)
+```
+
+Just how many zeroes are there? First, the number of zeroes across all posts.
+```{r, echo=TRUE}
+summary(short.posts$newcomer.comments.removed.zero)
+```
+
+Next, the number of zeroes across all posts that were allowed to be visible.
+```{r, echo=TRUE}
+summary(subset(short.posts, visible=="True")$newcomer.comments.removed.zero)
+```
+
+##### Logistic Regression for Modeling Zeroes in newcomer.comments.removed
+
+**Covariate decision for zero prediction **: visible + post.sub.top.minutes
+
+```{r, echo=TRUE,results='asis'}
+ncrmz1 <- glm(newcomer.comments.removed.zero ~ 1, data=short.posts, family=binomial)
+ncrmz2 <- glm(newcomer.comments.removed.zero ~ visible, data=short.posts, family=binomial)
+ncrmz3 <- glm(newcomer.comments.removed.zero ~ visible + post.sub.top.minutes, data=short.posts, family=binomial)
+ncrmz4 <- glm(newcomer.comments.removed.zero ~ visible + post.sub.top.minutes + post.ama, data=short.posts, family=binomial)
+ncrmz5 <- glm(newcomer.comments.removed.zero ~ visible + post.sub.top.minutes + post.hour + I(post.hour^2), data=short.posts, family=binomial)
+ncrmz6 <- glm(newcomer.comments.removed.zero ~ visible + post.sub.top.minutes + weekend, data=short.posts, family=binomial)
+ncrmz7 <- glm(newcomer.comments.removed.zero ~ visible + post.sub.top.minutes + post.flair, data=short.posts, family=binomial)
+
+htmlreg(list(ncrmexz1, ncrmexz2, ncrmexz3, ncrmexz4, ncrmexz5, ncrmexz6, ncrmexz7))
+```
+
+##### Zero Inflated Negative Binomial Regression for Modeling  newcomer.comments.removed
+
+
+
+```{r, echo=TRUE,results='asis'}
+model.newcomer.comments.rm.zi.1 <- zeroinfl(newcomer.comments.removed ~ 1 | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+model.newcomer.comments.rm.zi.2 <- zeroinfl(newcomer.comments.removed ~ visible | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+model.newcomer.comments.rm.zi.3 <- zeroinfl(newcomer.comments.removed ~ visible +  post.ama | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+model.newcomer.comments.rm.zi.4 <- zeroinfl(newcomer.comments.removed ~ visible + post.ama +  post.sub.top.minutes | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+model.newcomer.comments.rm.zi.5 <- zeroinfl(newcomer.comments.removed ~ visible + post.ama +  post.sub.top.minutes + weekend | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+model.newcomer.comments.rm.zi.6 <- zeroinfl(newcomer.comments.removed ~ visible + post.ama +  post.sub.top.minutes + weekend + post.flair | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+model.newcomer.comments.rm.zi.7 <- zeroinfl(newcomer.comments.removed ~ visible + post.ama +  post.sub.top.minutes + weekend + post.flair + post.hour + I(post.hour^2) | 
+                                                          visible + post.sub.top.minutes, 
+                                                        data=short.posts)
+
+htmlreg(list(model.newcomer.comments.rm.zi.1,
+             model.newcomer.comments.rm.zi.2,
+             model.newcomer.comments.rm.zi.3,          
+             model.newcomer.comments.rm.zi.4,          
+             model.newcomer.comments.rm.zi.5,
+             model.newcomer.comments.rm.zi.6,
+             model.newcomer.comments.rm.zi.7), type="html")
+```
+
+#### Modeling DV: newcomer.comments
+
+**How should we model this?** We should use a zero-inflated negative binomial model, since there are a large number of zeroes in the data.
+
+First consider the newcomer comment count for all posts:
+
+```{r, fig.width=7, fig.height=2, echo=FALSE}
+ggplot(short.posts, aes(newcomer.comments)) +
+  ggtitle("Newcomer Comments Per Post, July 4 - 14 2016") +
+  geom_histogram(bins=100)
+```
+
+The number of newcomer comments is much lower when we consider whether a post was allowed to be visible or not. Here's the dependent variable for posts that moderators allowed to remain.
+```{r, fig.width=7, fig.height=2, echo=FALSE}
+ggplot(subset(short.posts, visible=="True"), aes(newcomer.comments)) +
+  ggtitle("Newcomer Comments Per Visible Post, July 4 - 14 2016") +
+  geom_histogram(bins=100)
+```
+
+Just how many zeroes are there? First, the number of zeroes across all posts.
+```{r, echo=TRUE}
+summary(short.posts$newcomer.comments.zero)
+```
+
+Next, the number of zeroes across all posts that were allowed to be visible.
+```{r, echo=TRUE}
+summary(subset(short.posts, visible=="True")$newcomer.comments.zero)
+```
+
+##### Logistic Regression for Modeling Zeroes in newcomer.comments
+
+**Covariate decision for zero prediction **: visible + post.sub.top.minutes
+
+```{r, echo=TRUE,results='asis'}
+ncz1 <- glm(newcomer.comments.zero ~ 1, data=short.posts, family=binomial)
+ncz2 <- glm(newcomer.comments.zero ~ visible, data=short.posts, family=binomial)
+ncz3 <- glm(newcomer.comments.zero ~ visible + post.sub.top.minutes, data=short.posts, family=binomial)
+ncz4 <- glm(newcomer.comments.zero ~ visible + post.sub.top.minutes + post.ama, data=short.posts, family=binomial)
+ncz5 <- glm(newcomer.comments.zero ~ visible + post.sub.top.minutes + post.hour + I(post.hour^2), data=short.posts, family=binomial)
+ncz6 <- glm(newcomer.comments.zero ~ visible + post.sub.top.minutes + weekend, data=short.posts, family=binomial)
+ncz7 <- glm(newcomer.comments.zero ~ visible + post.sub.top.minutes + post.flair, data=short.posts, family=binomial)
+
+htmlreg(list(ncz1, ncz2, ncz3, ncz4, ncz5, ncz6, ncz7))
+```
+##### Zero Inflated Negative Binomial Regression for Modeling newcomer.comments
+
+**Covariate decision**: visible + post.ama +  post.sub.top.minutes + experiment.day.minutes + weekend + post.flair
+
+```{r, echo=TRUE,results='asis'}
+model.newcomer.comments.zi.1 <- zeroinfl(newcomer.comments ~ 1 | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.zi.2 <- zeroinfl(newcomer.comments ~ visible | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.zi.3 <- zeroinfl(newcomer.comments ~ visible + post.ama| 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.zi.4 <- zeroinfl(newcomer.comments ~ visible + post.ama + post.sub.top.minutes | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.zi.5 <- zeroinfl(newcomer.comments ~ visible + post.ama + post.sub.top.minutes + post.hour + I(post.hour^2)  | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.zi.6 <- zeroinfl(newcomer.comments ~ visible + post.ama + post.sub.top.minutes + post.hour + I(post.hour^2) + weekend | 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+model.newcomer.comments.zi.7 <- zeroinfl(newcomer.comments ~ visible + post.ama + post.sub.top.minutes + post.hour + I(post.hour^2) + weekend + post.flair| 
+                                               visible + post.sub.top.minutes,  data=short.posts)
+
+htmlreg(list(model.newcomer.comments.zi.1,
+          model.newcomer.comments.zi.2,
+          model.newcomer.comments.zi.3,
+          model.newcomer.comments.zi.4,
+          model.newcomer.comments.zi.5,
+          model.newcomer.comments.zi.6,
+          model.newcomer.comments.zi.7), type="text")
+```
+
+### How Could a Comment-level Estimation Be Conducted?
+An alternative approach would be to fit the model on a per-comment basis, which would make the modeling much, much simpler. Here, we would basically be fitting a random intercepts logistic regression model on whether a given comment was likely to be removed or not. The dependent variable would be
+
+* *visible*: within a post, the number of newcomer comments
+
+#### Modeling DV: visible
+
+**How should we model this?** We should use a random intercepts logistic regression that includes the post as a random intercepts
+
+```{r, echo=TRUE}
+summary(short.comments$visible)
+```
+
+##### Random Intercept Logistic Regression With Post ID as a Level-2 Predictor
+
+```{r, echo=TRUE,results='asis'}
+ccv1 <- glmer(visible ~ 1 + (1 | link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccv2 <- glmer(visible ~ post.visible + (1 | link_id), data = short.comments, family = binomial)
+ccv3 <- glmer(visible ~ post.visible + post.sub.top.minutes + (1 | link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccv4 <- glmer(visible ~ post.visible + post.sub.top.minutes + post.ama + (1 | link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccv5 <- glmer(visible ~ post.visible + post.sub.top.minutes + post.ama + post.flair + (1 | link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccv6 <- glmer(visible ~ post.visible + post.sub.top.minutes + post.ama + post.flair + toplevel + (1 | link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccv7 <- glmer(visible ~ post.visible + post.sub.top.minutes + post.ama + post.flair + toplevel + weekend + (1 | link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccv8 <- glmer(visible ~ post.visible + post.sub.top.minutes + post.ama + post.flair + toplevel + post.hour + I(post.hour^2) + (1 | link_id), data = short.comments, family = binomial, nAGQ = 0)
+
+htmlreg(list(ccv1,ccv2,ccv3,ccv4,ccv5,ccv6,ccv7, ccv8))
+```
+
+##### Random Intercept Logistic Regression With Post ID as a Level-2 Predictor and Flair as a Level-3 Predictor
+The estimates are very similar here. I'm not sure we gain that much more by making the model this complex. But the good news is that the estimates look very similar however we do this.
+
+```{r, echo=TRUE,results='asis'}
+ccvri1 <- glmer(visible ~ 1 + (1 | post.flair/link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccvri2 <- glmer(visible ~ post.visible + (1 | post.flair/link_id), data = short.comments, family = binomial)
+ccvri3 <- glmer(visible ~ post.visible + post.sub.top.minutes + (1 | post.flair/link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccvri4 <- glmer(visible ~ post.visible + post.sub.top.minutes + post.ama + (1 | post.flair/link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccvri5 <- glmer(visible ~ post.visible + post.sub.top.minutes + post.ama + toplevel + (1 | post.flair/link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccvri6 <- glmer(visible ~ post.visible + post.sub.top.minutes + post.ama + toplevel + weekend + (1 | post.flair/link_id), data = short.comments, family = binomial, nAGQ = 0)
+ccvri7 <- glmer(visible ~ post.visible + post.sub.top.minutes + post.ama + toplevel + post.hour + I(post.hour^2) + (1 | post.flair/link_id), data = short.comments, family = binomial, nAGQ = 0)
+
+htmlreg(list(ccvri1,ccvri2,ccvri3,ccvri4,ccvri5,ccvri6,ccvri7))
+```
+
+## Which Experiment to Run?
+The ***sticky comment*** is the clear winner from this analysis. 
+
+* ***con***: For a given newcomer comment, I think that sticky comments will have a lesser effect on the chance of removal than the comment rule notification. The comment rule is much more **salienct** than the sticky comment. Cialdini's work on salience makes me much more confident in the sticky comment.
+* ***pro***: The comment rule intervention will be seen by less than 60% of participants, while every participant sees the sticky comment
+* ***pro***: The sticky comment experiment allows multiple methods of estimation, with the logistic regression much, much simpler than the zero inflated negative binomial model. In contrast, the comment rule experiment has a complicated model that relies on the ability to adjust the model for counts that vary widely, and whose variation is hard to explain.
+* ***pro***: Since there are many posts per day, and since the sticky comment experiment can be estimated at a per-comment level, it's possible to get large numbers of observations more quickly for the sticky comment experiment than the comment rule one.
+
+For all these reasons, I suggest going with the sticky comment experiment in the first place, and then moving on to the comment rule one from there.

@@ -3,6 +3,11 @@ jupyter_notebook_config.py
 private_data/*
 outputs/*
 praw.ini
+reports/*cache*
+.Rdata
+.Rhistory
+*.Rproj
+*.RData
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -93,3 +98,4 @@ ENV/
 
 # Rope project settings
 .ropeproject
+.Rproj.user
