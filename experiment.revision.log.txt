@@ -1,0 +1,4 @@
+06.28.2016: uploaded initial experiment design to Open Science Framework, randomizing on days, and offering comment box rules as an intervention
+07.08.2016: discovered that only 54% of commenters see the intervention. Decided to change the experiment: https://github.com/c4fcm/CivilServant-Analysis/blob/master/User%20Agent%20Analysis%2C%20July%208%2C%202016.ipynb
+07.16.2016: completed initial analysis for an updated experiment, with a new intervention and regression adjustment covariates. The updated expermient design randomizes on post and offers a "sticky post" intervention: https://github.com/c4fcm/CivilServant-Analysis/commit/7c7fe19c4cce3deb9cfc185297afe340d89640ca
+07.19.2016: uploaded new experiment pre-registration plan to account for these changes to the experiment design
