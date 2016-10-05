@@ -88,7 +88,7 @@ ccv3 <- glmer(visible ~ post.visible + post.ama + (1 | link_id), data = newcomer
 ccv4 <- glmer(visible ~ post.visible + post.ama + post.sub.top.minutes.ln + (1 | link_id), data = newcomer.comments, family = binomial, nAGQ=2)
 ccv5 <- glmer(visible ~ post.visible + post.ama + post.sub.top.minutes.ln + post.treatment + (1 | link_id), data = newcomer.comments, family = binomial, nAGQ=2)
 
-htmlreg(list(ccv1, ccv2, ccv3, ccv4, ccv5))
+htmlreg(list(ccv1, ccv2, ccv3, ccv4, ccv5), include.deviance = TRUE)
 ```
 
 ```{r echo=FALSE}
@@ -102,7 +102,7 @@ I tested the effect of sticky comments on the number of newcomers by using a zer
 zcm1 <- zeroinfl(newcomer.comments ~ 1 | visible + post.sub.top.minutes.ln, data=exs.posts, dist = "poisson")
 zcm2 <- zeroinfl(newcomer.comments ~ visible + post.ama + post.flair + post.sub.top.minutes.ln + weekend + post.hour + I(post.hour^2) | visible + post.sub.top.minutes.ln, data=exs.posts, dist = "poisson")
 zcm3 <- zeroinfl(newcomer.comments ~ visible + post.ama + post.flair + post.sub.top.minutes.ln + weekend + post.hour + I(post.hour^2) + TREAT | visible + post.sub.top.minutes.ln, data=exs.posts, dist = "poisson")
-htmlreg(list(zcm1, zcm2, zcm3))
+htmlreg(list(zcm1, zcm2, zcm3), include.deviance = TRUE)
 ```
 ## Revisiting the Effect of Sticky Comments on the Number of Commenters ##  {#different_count_effects}
 
@@ -132,7 +132,7 @@ I didn't anticipate this possibility at all, so it's not part of the pre-analysi
 
 ```{r, echo=TRUE, results='asis'}
 zcm4 <- zeroinfl(newcomer.comments ~ visible + post.ama + post.flair + post.sub.top.minutes.ln + weekend + post.hour + I(post.hour^2) + TREAT + post.ama:TREAT | visible + post.sub.top.minutes.ln, data=exs.posts, dist = "poisson")
-htmlreg(list(zcm3, zcm4))
+htmlreg(list(zcm3, zcm4), include.deviance = TRUE)
 ```
 ### Revisiting the Modeling Approach for Predicting The Number of Newcomer Comments
 Another possible problem is that AMAs and non-AMAs might need to be modeled differently. AMAs never get zero comments, so the distribution of the dependent variable is very different for them. They are never removed by moderators, and they never happen on weekends, so some of the regression adjustment covariates don't apply in their case. Furthermore, there are only 24 AMAs in the sample, so they may get overpowered by all of the non-AMA threads in the final result. Those differences are very clear in the following log-transformed chart of newcomer comments per post:
@@ -162,7 +162,7 @@ To confirm if posting the rules to AMAs had a negative effect on the number of n
 nb1 <- glm.nb(newcomer.comments ~ 1, data=subset(exs.posts, post.ama==TRUE))
 nb2 <- glm.nb(newcomer.comments ~ visible + post.sub.top.minutes.ln, data=subset(exs.posts, post.ama==TRUE))
 nb3 <- glm.nb(newcomer.comments ~ visible + post.sub.top.minutes.ln +  TREAT, data=subset(exs.posts, post.ama==TRUE))
-htmlreg(list(nb1, nb2, nb3))
+htmlreg(list(nb1, nb2, nb3), include.deviance = TRUE)
 ```
 
 ### Why Might AMAs have the opposite effect from non-AMAs?
@@ -189,7 +189,7 @@ First, was there an effect on the rule-compliance across all commenters? Yes. Ac
 ```{r, echo=TRUE, results='asis'}
 occv1 <- glmer(visible ~ 1 + (1 | link_id), data = exs.comments, family = binomial, nAGQ=2)
 occv5 <- glmer(visible ~ post.visible + post.ama + post.sub.top.minutes.ln + post.treatment + (1 | link_id), data = exs.comments, family = binomial, nAGQ=2)
-htmlreg(list(occv1, occv5))
+htmlreg(list(occv1, occv5), include.deviance = TRUE)
 ```
 
 Next, was there an effect on the number of commenters overall? In a zero-inflated poisson regression model, posting a sticky comment to a non-AMA threads increased the incidence rate of comments by `r signif(h2.all.nonama*100., 3)`%, while posting sticky comments to AMA threads reduced the incidence rate of comments by `r signif(h2.all.ama*100., 3)`%, on average across r/science..
@@ -199,7 +199,7 @@ ozcm1 <- zeroinfl(num.comments ~ 1 | visible + post.sub.top.minutes.ln, data=exs
 ozcm2 <- zeroinfl(num.comments ~ visible + post.ama + post.flair + post.sub.top.minutes.ln + weekend + post.hour + I(post.hour^2) | visible + post.sub.top.minutes.ln, data=exs.posts, dist = "poisson")
 ozcm3 <- zeroinfl(num.comments ~ visible + post.ama + post.flair + post.sub.top.minutes.ln + weekend + post.hour + I(post.hour^2) + TREAT | visible + post.sub.top.minutes.ln, data=exs.posts, dist = "poisson")
 ozcm4 <- zeroinfl(num.comments ~ visible + post.ama + post.flair + post.sub.top.minutes.ln + weekend + post.hour + I(post.hour^2) + TREAT + post.ama:TREAT | visible + post.sub.top.minutes.ln, data=exs.posts, dist = "poisson")
-htmlreg(list(ozcm1, ozcm4))
+htmlreg(list(ozcm1, ozcm4), include.deviance = TRUE)
 ```
 
 ## Do Sticky Comments Increase or Decrease Moderation Work Overall? ##      {#overall_work}
@@ -230,7 +230,7 @@ ocrm1 <- zeroinfl(num.comments.removed ~ 1 | visible + post.sub.top.minutes.ln, 
 ozcrm2 <- zeroinfl(num.comments.removed ~ visible + post.ama + post.flair + post.sub.top.minutes.ln + weekend + post.hour + I(post.hour^2) | visible + post.sub.top.minutes.ln, data=exs.posts, dist = "poisson")
 ozcrm3 <- zeroinfl(num.comments.removed ~ visible + post.ama + post.flair + post.sub.top.minutes.ln + weekend + post.hour + I(post.hour^2) + TREAT | visible + post.sub.top.minutes.ln, data=exs.posts, dist = "poisson")
 ozcrm4 <- zeroinfl(num.comments.removed ~ visible + post.ama + post.flair + post.sub.top.minutes.ln + weekend + post.hour + I(post.hour^2) + TREAT + post.ama:TREAT | visible + post.sub.top.minutes.ln, data=exs.posts, dist = "poisson")
-htmlreg(list(ozcrm1, ozcrm4))
+htmlreg(list(ozcrm1, ozcrm4), include.deviance = TRUE)
 ```
 
 ## Acknowledgments

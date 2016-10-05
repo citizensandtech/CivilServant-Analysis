@@ -11,7 +11,7 @@
 
 <meta name="author" content="J. Nathan Matias (blog) (/u/natematias) (twitter)." />
 
-<meta name="date" content="2016-10-02" />
+<meta name="date" content="2016-10-05" />
 
 <title>Do Sticky Comments Improve The Participation of First-Time Commenters?</title>
 
@@ -192,7 +192,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">Do Sticky Comments Improve The Participation of First-Time Commenters?</h1>
 <h4 class="author"><em>J. Nathan Matias (<a href="https://civic.mit.edu/blog/natematias">blog</a>) (<a href="https://reddit.com/u/natematias">/u/natematias</a>) (<a href="https://twitter.com/natematias">twitter</a>).</em></h4>
-<h4 class="date"><em>October 02, 2016</em></h4>
+<h4 class="date"><em>October 05, 2016</em></h4>
 
 </div>
 
@@ -284,7 +284,7 @@ ccv3 &lt;-<span class="st"> </span><span class="kw">glmer</span>(visible ~<span 
 ccv4 &lt;-<span class="st"> </span><span class="kw">glmer</span>(visible ~<span class="st"> </span>post.visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>(<span class="dv">1</span> |<span class="st"> </span>link_id), <span class="dt">data =</span> newcomer.comments, <span class="dt">family =</span> binomial, <span class="dt">nAGQ=</span><span class="dv">2</span>)
 ccv5 &lt;-<span class="st"> </span><span class="kw">glmer</span>(visible ~<span class="st"> </span>post.visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>post.treatment +<span class="st"> </span>(<span class="dv">1</span> |<span class="st"> </span>link_id), <span class="dt">data =</span> newcomer.comments, <span class="dt">family =</span> binomial, <span class="dt">nAGQ=</span><span class="dv">2</span>)
 
-<span class="kw">htmlreg</span>(<span class="kw">list</span>(ccv1, ccv2, ccv3, ccv4, ccv5))</code></pre></div>
+<span class="kw">htmlreg</span>(<span class="kw">list</span>(ccv1, ccv2, ccv3, ccv4, ccv5), <span class="dt">include.deviance =</span> <span class="ot">TRUE</span>)</code></pre></div>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <table cellspacing="0" align="center" style="border: none;">
 <caption align="bottom" style="margin-top:0.3em;">
@@ -526,6 +526,26 @@ BIC
 </tr>
 <tr>
 <td style="padding-right: 12px; border: none;">
+Deviance
+</td>
+<td style="padding-right: 12px; border: none;">
+22477.45
+</td>
+<td style="padding-right: 12px; border: none;">
+22473.98
+</td>
+<td style="padding-right: 12px; border: none;">
+22476.06
+</td>
+<td style="padding-right: 12px; border: none;">
+22480.89
+</td>
+<td style="padding-right: 12px; border: none;">
+22489.44
+</td>
+</tr>
+<tr>
+<td style="padding-right: 12px; border: none;">
 Log Likelihood
 </td>
 <td style="padding-right: 12px; border: none;">
@@ -672,7 +692,7 @@ Variance: Residual
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">zcm1 &lt;-<span class="st"> </span><span class="kw">zeroinfl</span>(newcomer.comments ~<span class="st"> </span><span class="dv">1</span> |<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span>exs.posts, <span class="dt">dist =</span> <span class="st">&quot;poisson&quot;</span>)
 zcm2 &lt;-<span class="st"> </span><span class="kw">zeroinfl</span>(newcomer.comments ~<span class="st"> </span>visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.flair +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>weekend +<span class="st"> </span>post.hour +<span class="st"> </span><span class="kw">I</span>(post.hour^<span class="dv">2</span>) |<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span>exs.posts, <span class="dt">dist =</span> <span class="st">&quot;poisson&quot;</span>)
 zcm3 &lt;-<span class="st"> </span><span class="kw">zeroinfl</span>(newcomer.comments ~<span class="st"> </span>visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.flair +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>weekend +<span class="st"> </span>post.hour +<span class="st"> </span><span class="kw">I</span>(post.hour^<span class="dv">2</span>) +<span class="st"> </span>TREAT |<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span>exs.posts, <span class="dt">dist =</span> <span class="st">&quot;poisson&quot;</span>)
-<span class="kw">htmlreg</span>(<span class="kw">list</span>(zcm1, zcm2, zcm3))</code></pre></div>
+<span class="kw">htmlreg</span>(<span class="kw">list</span>(zcm1, zcm2, zcm3), <span class="dt">include.deviance =</span> <span class="ot">TRUE</span>)</code></pre></div>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <table cellspacing="0" align="center" style="border: none;">
 <caption align="bottom" style="margin-top:0.3em;">
@@ -1582,7 +1602,7 @@ Num. obs.
 </center>
 <p>I didn’t anticipate this possibility at all, so it’s not part of the pre-analysis plan. But if I add an interaction term to the model to tease out any differences(<strong>Model 2</strong>), I see that posting the rules to an AMA thread caused a <strong>59% increase </strong> in the incidence rate of newcomer comments, but <strong>in AMA threads, sticky comments caused a </strong>65.5% decrease** on average, the opposite outcome. This table shows the two models next to each other:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">zcm4 &lt;-<span class="st"> </span><span class="kw">zeroinfl</span>(newcomer.comments ~<span class="st"> </span>visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.flair +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>weekend +<span class="st"> </span>post.hour +<span class="st"> </span><span class="kw">I</span>(post.hour^<span class="dv">2</span>) +<span class="st"> </span>TREAT +<span class="st"> </span>post.ama:TREAT |<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span>exs.posts, <span class="dt">dist =</span> <span class="st">&quot;poisson&quot;</span>)
-<span class="kw">htmlreg</span>(<span class="kw">list</span>(zcm3, zcm4))</code></pre></div>
+<span class="kw">htmlreg</span>(<span class="kw">list</span>(zcm3, zcm4), <span class="dt">include.deviance =</span> <span class="ot">TRUE</span>)</code></pre></div>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <table cellspacing="0" align="center" style="border: none;">
 <caption align="bottom" style="margin-top:0.3em;">
@@ -2360,7 +2380,7 @@ Num. obs.
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">nb1 &lt;-<span class="st"> </span><span class="kw">glm.nb</span>(newcomer.comments ~<span class="st"> </span><span class="dv">1</span>, <span class="dt">data=</span><span class="kw">subset</span>(exs.posts, post.ama==<span class="ot">TRUE</span>))
 nb2 &lt;-<span class="st"> </span><span class="kw">glm.nb</span>(newcomer.comments ~<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span><span class="kw">subset</span>(exs.posts, post.ama==<span class="ot">TRUE</span>))
 nb3 &lt;-<span class="st"> </span><span class="kw">glm.nb</span>(newcomer.comments ~<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st">  </span>TREAT, <span class="dt">data=</span><span class="kw">subset</span>(exs.posts, post.ama==<span class="ot">TRUE</span>))
-<span class="kw">htmlreg</span>(<span class="kw">list</span>(nb1, nb2, nb3))</code></pre></div>
+<span class="kw">htmlreg</span>(<span class="kw">list</span>(nb1, nb2, nb3), <span class="dt">include.deviance =</span> <span class="ot">TRUE</span>)</code></pre></div>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <table cellspacing="0" align="center" style="border: none;">
 <caption align="bottom" style="margin-top:0.3em;">
@@ -2583,7 +2603,7 @@ Num. obs.
 </center>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">occv1 &lt;-<span class="st"> </span><span class="kw">glmer</span>(visible ~<span class="st"> </span><span class="dv">1</span> +<span class="st"> </span>(<span class="dv">1</span> |<span class="st"> </span>link_id), <span class="dt">data =</span> exs.comments, <span class="dt">family =</span> binomial, <span class="dt">nAGQ=</span><span class="dv">2</span>)
 occv5 &lt;-<span class="st"> </span><span class="kw">glmer</span>(visible ~<span class="st"> </span>post.visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>post.treatment +<span class="st"> </span>(<span class="dv">1</span> |<span class="st"> </span>link_id), <span class="dt">data =</span> exs.comments, <span class="dt">family =</span> binomial, <span class="dt">nAGQ=</span><span class="dv">2</span>)
-<span class="kw">htmlreg</span>(<span class="kw">list</span>(occv1, occv5))</code></pre></div>
+<span class="kw">htmlreg</span>(<span class="kw">list</span>(occv1, occv5), <span class="dt">include.deviance =</span> <span class="ot">TRUE</span>)</code></pre></div>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <table cellspacing="0" align="center" style="border: none;">
 <caption align="bottom" style="margin-top:0.3em;">
@@ -2720,6 +2740,17 @@ BIC
 </tr>
 <tr>
 <td style="padding-right: 12px; border: none;">
+Deviance
+</td>
+<td style="padding-right: 12px; border: none;">
+72263.32
+</td>
+<td style="padding-right: 12px; border: none;">
+72255.36
+</td>
+</tr>
+<tr>
+<td style="padding-right: 12px; border: none;">
 Log Likelihood
 </td>
 <td style="padding-right: 12px; border: none;">
@@ -2784,7 +2815,7 @@ Variance: Residual
 ozcm2 &lt;-<span class="st"> </span><span class="kw">zeroinfl</span>(num.comments ~<span class="st"> </span>visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.flair +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>weekend +<span class="st"> </span>post.hour +<span class="st"> </span><span class="kw">I</span>(post.hour^<span class="dv">2</span>) |<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span>exs.posts, <span class="dt">dist =</span> <span class="st">&quot;poisson&quot;</span>)
 ozcm3 &lt;-<span class="st"> </span><span class="kw">zeroinfl</span>(num.comments ~<span class="st"> </span>visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.flair +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>weekend +<span class="st"> </span>post.hour +<span class="st"> </span><span class="kw">I</span>(post.hour^<span class="dv">2</span>) +<span class="st"> </span>TREAT |<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span>exs.posts, <span class="dt">dist =</span> <span class="st">&quot;poisson&quot;</span>)
 ozcm4 &lt;-<span class="st"> </span><span class="kw">zeroinfl</span>(num.comments ~<span class="st"> </span>visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.flair +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>weekend +<span class="st"> </span>post.hour +<span class="st"> </span><span class="kw">I</span>(post.hour^<span class="dv">2</span>) +<span class="st"> </span>TREAT +<span class="st"> </span>post.ama:TREAT |<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span>exs.posts, <span class="dt">dist =</span> <span class="st">&quot;poisson&quot;</span>)
-<span class="kw">htmlreg</span>(<span class="kw">list</span>(ozcm1, ozcm4))</code></pre></div>
+<span class="kw">htmlreg</span>(<span class="kw">list</span>(ozcm1, ozcm4), <span class="dt">include.deviance =</span> <span class="ot">TRUE</span>)</code></pre></div>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <table cellspacing="0" align="center" style="border: none;">
 <caption align="bottom" style="margin-top:0.3em;">
@@ -3504,7 +3535,7 @@ Num. obs.
 ozcrm2 &lt;-<span class="st"> </span><span class="kw">zeroinfl</span>(num.comments.removed ~<span class="st"> </span>visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.flair +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>weekend +<span class="st"> </span>post.hour +<span class="st"> </span><span class="kw">I</span>(post.hour^<span class="dv">2</span>) |<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span>exs.posts, <span class="dt">dist =</span> <span class="st">&quot;poisson&quot;</span>)
 ozcrm3 &lt;-<span class="st"> </span><span class="kw">zeroinfl</span>(num.comments.removed ~<span class="st"> </span>visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.flair +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>weekend +<span class="st"> </span>post.hour +<span class="st"> </span><span class="kw">I</span>(post.hour^<span class="dv">2</span>) +<span class="st"> </span>TREAT |<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span>exs.posts, <span class="dt">dist =</span> <span class="st">&quot;poisson&quot;</span>)
 ozcrm4 &lt;-<span class="st"> </span><span class="kw">zeroinfl</span>(num.comments.removed ~<span class="st"> </span>visible +<span class="st"> </span>post.ama +<span class="st"> </span>post.flair +<span class="st"> </span>post.sub.top.minutes.ln +<span class="st"> </span>weekend +<span class="st"> </span>post.hour +<span class="st"> </span><span class="kw">I</span>(post.hour^<span class="dv">2</span>) +<span class="st"> </span>TREAT +<span class="st"> </span>post.ama:TREAT |<span class="st"> </span>visible +<span class="st"> </span>post.sub.top.minutes.ln, <span class="dt">data=</span>exs.posts, <span class="dt">dist =</span> <span class="st">&quot;poisson&quot;</span>)
-<span class="kw">htmlreg</span>(<span class="kw">list</span>(ozcrm1, ozcrm4))</code></pre></div>
+<span class="kw">htmlreg</span>(<span class="kw">list</span>(ozcrm1, ozcrm4), <span class="dt">include.deviance =</span> <span class="ot">TRUE</span>)</code></pre></div>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <table cellspacing="0" align="center" style="border: none;">
 <caption align="bottom" style="margin-top:0.3em;">
