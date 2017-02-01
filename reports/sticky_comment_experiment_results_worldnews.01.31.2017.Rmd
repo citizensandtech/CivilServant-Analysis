@@ -10,11 +10,12 @@ output:
   theme: spacelab # many options for theme, this one is my favorite.
   highlight: tango # specifies the syntax highlighting style
   code_folding: hide
+  css: report.style.css
 ---
 
-```{r analysis, include=FALSE, cache=TRUE, cache.extra=file.info('../r_worldnews_sticky_experiment_results_01.18.2017.RData')}
+```{r analysis, include=FALSE, cache=TRUE, cache.extra=file.info('../r_worldnews_sticky_experiment_results_01.21.2017.RData')}
 knitr::opts_chunk$set(echo=TRUE, warning=FALSE)
-load('../r_worldnews_sticky_experiment_results_01.18.2017.RData')
+load('../r_worldnews_sticky_experiment_results_01.21.2017.RData')
 library(ggplot2)
 library(lubridate)
 library(stargazer)
@@ -26,37 +27,27 @@ library(rms)
 library(MASS)
 library(pscl)
 library(lme4)
+require(utils)
+library(merTools)
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
 ```
 Some online news sources regularly publish inaccurate, sensational articles that often receive disproportionate amounts of attention. When these articles are shared on social media platforms, they sometimes spread more quickly and widely than articles with more measured language and sourcing practices. Responses that work to verify claims or offer alternative views could reduce a perceived social consensus supporting the article [1] or even lead to changed beliefs [2]. Yet in online discussions, responding to unreliable articles could also have the effect of promoting those articles through algorithms that determine the relative prominence of information on a platform.
 
-In this experiment with r/worldnews, a 14.8 million subscriber community on the reddit platform, we ask if using "sticky comments" encouraging norms of evidence-based discussion increases the chance that commenters will link to evidence. We also ask a second set of questions related to reddit's ranking systems with two "arms," two different kinds of sticky comments. In one arm of the experiment, we consider if encouraging skepticism causes reddit's algorithm promoting posts from unreliable websites. We expect the other arm to reduce a post's prominence in the site's rankings.
+In this experiment we ask if using "sticky comments" encouraging norms of evidence-based discussion increases the chance that commenters will link to evidence. We also ask a second set of questions related to reddit's ranking systems with two "arms," two different kinds of sticky comments. In one arm of the experiment, we consider if encouraging skepticism causes reddit's algorithm promoting posts from unreliable websites. We expect the other arm to reduce a post's prominence in the site's rankings.
 
 The research site is r/worldnews, a 14.8 million subscriber subreddit community on the social news platform reddit, where links to news are often shared and discussed. Measured in November 2016, this English language community received 914 posts per day on average, 2.4% of which are from tabloid news sites that community members tend to report for being more sensational and less reliably sourced. Of all of these tabloid posts, 46% are permitted by moderators. Among all tabloid posts 78% have at least one comment and 28% have at least one comment with a link. Across all comments in discussions of tabloid posts, 5% of comments include at least one link.
 
-Moderators also report that tabloid posts are often among the most highly recommended in their subreddit by the reddit platform. Even small changes in the reception orprominence of these articles might have a substantial effect on the experience of the subreddit's many readers. On the reddit platform, readers are able to influence the prominence of discussions. They can add "upvotes" or "downvotes" to the thread to influence its relative prominence in the platform's ranking system. While reddit does not publicize the number of votes received by a discussion, software can regularly query the position of a post on the subreddit's front page or the site-wide listing of top discussions. Furthermore, the platform does provide information on the "score" of a post, a number partially-based on upvotes and downvotes which is used to determine rankings. In an email on Jan 16, 2017, a reddit employee confirmed to me that: "between two posts of similar age, the one with a higher score will tend to be ranked more highly in the HOT algorithm on average," especially for the default HOT listing on a subreddit.
+Moderators also report that tabloid posts are often highly recommended in their subreddit by the reddit platform. Even small changes in the reception orprominence of these articles might have a substantial effect on the experience of the subreddit's many readers. On the reddit platform, readers are able to influence the prominence of discussions. They can add "upvotes" or "downvotes" to the thread to influence its relative prominence in the platform's ranking system. While reddit does not publicize the number of votes received by a discussion, software can regularly query the position of a post on the subreddit's front page or the site-wide listing of top discussions. Furthermore, the platform does provide information on the "score" of a post, a number partially-based on upvotes and downvotes which is used to determine rankings. In an email on Jan 16, 2017, a reddit employee confirmed to me that: "between two posts of similar age, the one with a higher score will tend to be ranked more highly in the HOT algorithm on average," especially for the default HOT listing on a subreddit.
 
 ## What Outcomes Would We Expect?
 We expect that posting a message encouraging people to link to evidence will cause people to be more likely link to evidence in their comments. In a previous experiment with r/science, we found that [posting sticky comments with the subreddit rules caused newcomers to be more likely to follow subreddit rules](http://civilservant.io/moderation_experiment_r_science_rule_posting.html). So we expect that our sticky comments will have some effect on commenting behavior.
 
-A recent study (not peer reviewed) found that adding a single upvote to a post early in its history could have very large effects on ultimate votes over time [4]. We can't be certain what expect from the reddit algorithm, since the score and HOT algorithms are not public knowledge (in an email on Jan 16, 2017, a reddit employee confirmed that they differ from the open source version of the reddit software). However we do have the ability to track the rank position and score of a submitted link over time, as shown in these early, exploratory charts from a prominent post:
+In this experiment, we also wondered if encouraging fact-checking of submissions might actually cause those submissions to become more promoted by reddit algorithms than they would otherwise. These recommendation systems, which attempt to surface popular and interesting submissions, pay attention to many markers of user activity and use that information to promote some submissions over others. On good days, these algorithms draw user attention to meaningful content; on others, they can concentrate attention toward misinformation and harassment [5]. For this reason, moderators consequently pay close attention to the things that "trend" in their subreddits. In this experiment, we expected that:
 
-<center><div style="width:450px; margin-top:20px; margin-bottom:20px;">
-![]( worldnews-01.2017/hot_ranking_sample.png)
-<br/>
-![]( worldnews-01.2017/score_time_sample.png)
-</div></center>
+* encouraging people to fact-check would have the side effect of causing tabloid submissions to be promoted in the subreddit HOT rankings
 
-We know that the algorithm pays attention to upvotes and downvotes, and many other things. We also know that the age of a post and its score are powerful predictors of the rank. Furthermore, the ranking of an individual item is relative to the score and age of other items in the list. I confirmed this in a statistical model of the page rank of `r length(unique(rankings$post.id))` posts between `r min(rankings$datetime)` and `r max(rankings$datetime)` based on snapshots of the top 100 items taken every 4 minutes.
-
-```{r, echo=FALSE, results='asis'}
-m1 <- lmer(rank ~ 1 + (1|post.id), data=rankings)
-m2 <- lmer(rank ~ score + minutes.elapsed + I(minutes.elapsed^2) + (1|post.id), data=rankings)
-m3 <- lmer(rank ~ score + minutes.elapsed + I(minutes.elapsed^2) + median.age + median.score + (1|post.id), data=rankings)
-
-htmlreg(list(m1, m2, m3), caption="Factors predicting the rank of a submission on r/worldnews/. Lower rank numbers are higher in the listing", digits=5, custom.note="*** p < 0.001, ** p < 0.01, * p < 0.05")
-```
-
-In these results we see that among posts appearing in the top 100 of a given ranking at a moment in time, posts with higher scores receive higher rankings (0 is higher, 100 is lower), and that older posts are ranked lower. We also see that the ranking of a post is related to the median score and median age of the other items in the rankings. If the tendency of scores at a given time is lower, then a small positive difference in score will be associated with a larger difference in the rankings. To sum up, **we can expect that if our intervention affects the score of a post, it will also affect how the reddit HOT algorithm ranks that post**. 
+* encouraging people to fact-check and consider downvoting would dampen this side effect
 
 ## How We Tested The Effect of Our Sticky Comments
 To test the effect of our sticky comments, I used the /u/CivilServantBot, which continuously monitors all posts and comments in the subreddit, including the actions of moderators. The full experiment design is at [osf.io/hmq5m/](https://osf.io/hmq5m/); here is a brief summary. During the experiment, this bot randomly assigned sticky comments to posts from domains that moderators identified, sites that met two criteria: (a) the subreddit receives large volumes of links from these sites, and (b) community members routinely complain about them for sensationalized headlines and unreliable information. The list does not include many US sites because r/worldnews disallows news from the US:
@@ -82,18 +73,18 @@ A second sticky comment encouraged people to link to further evidence and also d
 ![]( worldnews-01.2017/worldnews_sticky_comment_b.png)
 </div></center>
 
-Within these domains, any post had an equal chance to receive (a) no sticky comment, (b) a the sticky comment encouraging links to evidence, or (c) the encouragement to downvote. 
+Within these domains, any post had an equal chance to receive (a) no sticky comment, (b) a the sticky comment encouraging links to evidence, or (c) the encouragement to downvote. Randomizations were conducted in balanced blocks of 12.
 
 ### Outcome Variables
 By comparing these three, we are able to make a *causal inference* about the effect of the sticky comment on the outcomes variables we care about:
 
 * the chance of a comment to **include links to further evidence**
 
-** Excluding bots, comments removed by moderators, links to other reddit pages, and links to image sites like giphy and quickmeme (we kept imgur, since its sometimes used for publishing photos of breaking news)
+    ** Excluding bots, comments removed by moderators, links to other reddit pages, and links to image sites like giphy and quickmeme (we kept imgur, since its sometimes used for publishing photos of breaking news)
 
 * We tried to monitor **the highest rank achieved by a post** in /r/worldnews/HOT, the default subreddit view
 
-** Unfortunately, our code only collected the top 100 items, rather than the larger list we intended. So we are substituting for the **score of the post after 24 hours**. We sampled the post score every four minutes.
+    ** Unfortunately, our code only collected the top 100 items, rather than the larger list we intended. So I use the **score of the post after 24 hours**. CivilServant sampled the post score every four minutes.
 
 During the experiment, reddit made a [change to the scores they report on the site](https://www.reddit.com/r/announcements/comments/5gvd6b/scores_on_posts_are_about_to_start_going_up/). The site formerly held scores at a ceiling, but starting on December 6, the platform begain to report the ``true'' score for a post. Since we were observing the scores over time, we were able to see the change in score caculations when they occurred. Here is a chart showing the change in score for two very popular posts.
 
@@ -109,21 +100,39 @@ In statistical tests of the effect of our experiment on the score of a post over
 
 In all but two posts, these two values are highly correlated (`r signif(cor(posts$snapshot.score, posts$later.score), 3)`), as you can see here in this plot comparing the two:
 
-<font color="red">TODO: remove all entries that were polled more recently than 223 hours?</font>
-
 <center>
-```{r fig.width=7, fig.height=3, echo=FALSE}
+```{r fig.width=7, fig.height=3, echo=TRUE}
 ggplot(posts, aes(log1p(snapshot.score), log1p(later.score))) +
   geom_point() +
   theme(axis.text.x = element_text(hjust=0, vjust=1, size=10), 
-        axis.title=element_text(size=14), 
+        axis.title=element_text(size=11), 
         #plot.margin = unit(c(1.5, 1, 1, 1), "cm"), 
-        plot.title = element_text(size = 14, colour = "black", vjust = -1)) +
+        plot.title = element_text(size = 12, colour = "black", vjust = -1)) +
   labs(x = "ln Score After 24 Hours",
      y = "ln Score After ~223 Hrs") +
   ggtitle("Most Scores Didn't Change After the reddit Algorithm Update, 12/06/2016")
 ```
 </center>
+
+In this experiment, we can't be certain what expect from the reddit algorithm, since the code behind the score and HOT algorithms are not public knowledge (in an email on Jan 16, 2017, a reddit employee confirmed that they differ from the open source version of the reddit software). But we can observe and test their behavior. A recent study (not peer reviewed) found that adding a single upvote to a post early in its history could have very large effects on ultimate votes over time [4]. However we do have the ability to track the rank position and score of a submitted link over time, as shown in these early, exploratory charts from a prominent post:
+
+<center><div style="width:450px; margin-top:20px; margin-bottom:20px;">
+![]( worldnews-01.2017/hot_ranking_sample.png)
+<br/>
+![]( worldnews-01.2017/score_time_sample.png)
+</div></center>
+
+We know that the algorithm pays attention to upvotes and downvotes, and many other things. We also know that the age of a post and its score are powerful predictors of the rank. Furthermore, the ranking of an individual item is relative to the score and age of other items in the list. I confirmed this in a statistical model of the page rank of `r length(unique(rankings$post.id))` posts between `r min(rankings$datetime)` and `r max(rankings$datetime)` based on snapshots of the top 100 items taken every 4 minutes.
+
+```{r, echo=TRUE, results='asis'}
+m1 <- lmer(rank ~ 1 + (1|post.id), data=rankings)
+m2 <- lmer(rank ~ score + minutes.elapsed + I(minutes.elapsed^2) + (1|post.id), data=rankings)
+m3 <- lmer(rank ~ score + minutes.elapsed + I(minutes.elapsed^2) + median.age + median.score + (1|post.id), data=rankings)
+
+htmlreg(list(m1, m2, m3), caption="Factors predicting the rank of a submission on r/worldnews/. Lower rank numbers are higher in the listing", digits=4, custom.note="*** p < 0.001, ** p < 0.01, * p < 0.05")
+```
+
+In these results we see that among posts appearing in the top 100 of a given ranking at a moment in time, posts with higher scores receive higher rankings (0 is higher, 100 is lower), and that older posts are ranked lower. We also see that the ranking of a post is related to the median score and median age of the other items in the rankings. If the tendency of scores at a given time is lower, then a small positive difference in score will be associated with a larger difference in the rankings. To sum up, **we can expect that if our intervention affects the score of a post, it will also affect how the reddit HOT algorithm ranks that post in a subreddit**. 
 
 ### Other Variables
 We also monitored many other variables about a post, including whether it was removed by moderators, the number of comments, the time a post was submitted, and whether the post was made on a weekend. We polled the score of the post every four minutes and took a snapshot of the HOT ranking every four minutes. This allowed us to generate a number for the median score and age of other items in the HOT ranking at the time.
@@ -138,23 +147,56 @@ I tested the effect of sticky comments on fact-checking behavior in two ways. Fi
 On average in discussions of tabloid submissions on r/worldnews, that encouraging skepticism had a positive effect on the chance that an individual comment would include at least one link:
 
 ```{r, echo=TRUE, results='asis'}
+tabloid.comments$post.comments.ln <- log1p(tabloid.comments$post.comments)
+
 ec1 <- robcov(lrm(includes.links ~ post.visible , x=T, y=T,data=tabloid.comments), cluster=tabloid.comments$link_id)
 ec2 <- robcov(lrm(includes.links ~ post.visible + treatment.a + treatment.b, x=T, y=T,data=tabloid.comments), cluster=tabloid.comments$link_id)
+ec3 <- robcov(lrm(includes.links ~ post.visible + treatment.a + treatment.b + post.comments.ln, x=T, y=T,data=tabloid.comments), cluster=tabloid.comments$link_id)
 
 fp.a <- 1/(1+exp(-1*(ec2$coefficients['Intercept'] + ec2$coefficients['post.visible=True'] + ec2$coefficients['treatment.a'])))
 fp.b <- 1/(1+exp(-1*(ec2$coefficients['Intercept'] + ec2$coefficients['post.visible=True'] + ec2$coefficients['treatment.b'])))
 fp.0 <- 1/(1+exp(-1*(ec2$coefficients['Intercept'] + ec2$coefficients['post.visible=True'])))
 
-htmlreg(list(ec1, ec2), caption="The effect of encouraging skepticism (treatment.a) and skepticism + downvoting (treatment.b) on the chance of a comment to include links", custom.note="*** p < 0.001, ** p < 0.01, * p < 0.05")
+htmlreg(list(ec1, ec2, ec3), caption="The effect of encouraging skepticism (treatment.a) and skepticism + downvoting (treatment.b) on the chance of a comment to include links", custom.note="*** p < 0.001, ** p < 0.01, * p < 0.05")
 ```
 
-On average, comments under tabloid submissions with no sticky comment have a `r signif((fp.0)*100, 3)`% chance of including a link. Posting a sticky comment **encouraging skepticism caused a comment to be `r signif((fp.a - fp.0)*100, 3)` percentage points more likely to include at least one link**.  Posting a sticky comment **encouraging skepticism and discerning downvotes caused a comment to be `r signif((fp.b - fp.0)*100, 3)` percentage points more likely to include at least one link**. Both results are statistically significant.
+On average, comments in a tabloid news thread with no sticky comment have a `r signif((fp.0)*100, 3)`% chance of including a link. Posting a sticky comment **encouraging skepticism caused a comment to be `r signif((fp.a - fp.0)*100, 3)` percentage points more likely to include at least one link**.  Posting a sticky comment **encouraging skepticism and discerning downvotes caused a comment to be `r signif((fp.b - fp.0)*100, 3)` percentage points more likely to include at least one link**. Both results are statistically significant. The original pre-analysis plan (Model 2) didn't account for the possibility that the sticky comment might also influence the number of comments. Model 3 adjusts for the effect on comment count, estimating the effect of encouraging fact-checking between two comments in tabloid news threads of similar length, on average in r/worldnews. The difference between Model 2 (our original plan) and Model 3 is small, so I have used Model 2 to report the results, as originally planned.
+
+<center>
+```{r fig.width=7, fig.height=3, echo=TRUE}
+ec2$stderrs <- sqrt(diag( vcov(ec2)))
+fp.a.upr <- 1/(1+exp(-1*(ec2$coefficients['Intercept'] + ec2$coefficients['post.visible=True'] + ec2$coefficients['treatment.a'] + 1.96*ec2$stderrs['treatment.a'])))
+fp.a.lwr <- 1/(1+exp(-1*(ec2$coefficients['Intercept'] + ec2$coefficients['post.visible=True'] + ec2$coefficients['treatment.a'] - 1.96*ec2$stderrs['treatment.a'])))
+fp.b.upr <- 1/(1+exp(-1*(ec2$coefficients['Intercept'] + ec2$coefficients['post.visible=True']  + ec2$coefficients['treatment.a'] + 1.96*ec2$stderrs['treatment.b'])))
+fp.b.lwr <- 1/(1+exp(-1*(ec2$coefficients['Intercept'] + ec2$coefficients['post.visible=True'] + ec2$coefficients['treatment.a'] - 1.96*ec2$stderrs['treatment.b'])))
+ec2df <- data.frame(
+  exp.group = factor(c("No Sticky Comment","Skepticism","Skepticism + Downvote")),
+  fit = c(fp.0,fp.a,fp.b),
+  upr = c(fp.0-0.001,fp.a.upr, fp.b.upr),
+  lwr = c(fp.0-0.001, fp.a.lwr, fp.b.lwr),
+  g = c(0,1,2)
+)
+ggplot(ec2df, aes(g,fit, fill=exp.group)) +
+  geom_bar(stat="identity") + 
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width=0.1) +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("% Chance of Including Links") +
+  scale_fill_manual(values=cbbPalette, name="Experiment Arms",labels=ec2df$exp.group) +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.title=element_text(size=11),
+        plot.title = element_text(size = 12, colour = "black", vjust = -1)) +
+  xlab(paste("Experiment in r/worldnews. Experiment post count: ", toString(ec2$clusterInfo$n),", comments:",toString(nrow(tabloid.comments)), sep="")) +
+  ggtitle("Effect on The Chance of Any Comment To Include Links")
+
+````
+</center>
 
 As documented in the code, I use [the Huber-White method for clustering the standard errors](https://www.rdocumentation.org/packages/rms/versions/5.1-0/topics/robcov) associated with having multiple comments for some posts. I also confidmed that the results for a random-intercepts logistic regression model are similar.
 
-**How important is this effect?** An increase in 1% might not seem much. However, working from the control group information, I estimate that over a similar `r as.integer((max(posts$datetime) - min(posts$datetime)), units = "days")` day period, the sticky comment could lead to `r signif( (nrow(subset(comments, post.treatment==0))*3) * fp.b, 3)` comments to include evidence that wouldn't have otherwise.
+**How important is this effect?** An increase in 1% might not seem much. However, working from the control group information, I estimate that over a similar `r as.integer((max(posts$datetime) - min(posts$datetime)), units = "days")` day period, the sticky comment could lead to `r signif( (nrow(subset(tabloid.comments, post.treatment==0))*3) * fp.b, 3)` comments to include evidence that wouldn't have otherwise.
 
-Even as we look at the effect on individual comments, we can also examine the effect on the number of evidence-bearing comments per post. This allows us to look at all `r nrow(posts)` posts, not just posts that received comments:
+As I mentioned, if we only look at the effect on individual comments, we under-estimate the effect on discussions as a whole. Using a negative binomial model, we can examine the effect on the number of evidence-bearing comments per post. This allows us to look at all `r nrow(posts)` posts, not just posts that received comments:
 
 ```{r, echo=TRUE, results='asis'}
 nc <- glm.nb(comment.links.comments ~ 1, data=posts)
@@ -165,13 +207,266 @@ htmlreg(list(nc, nc0, nc1), caption="The effect of encouraging skepticism (treat
 
 Within discussions of tabloid submissions on r/worldnews, **encouraging skeptical links increases the incidence rate of link-bearing comments by `r signif(exp(nc1$coefficients['treatment.aTRUE'])*100, 3)`% on average**, and the sticky **encouraging skepticism and discerning downvotes increases the incidence rate by `r signif(exp(nc1$coefficients['treatment.bTRUE'])*100, 3)`% on average**.
 
+<center>
+```{r fig.width=7, fig.height=3, echo=TRUE}
+nc1.sum <- summary(nc1)
+nplc.c <- exp(nc1$coefficients['(Intercept)'] + nc1$coefficients['visibleTrue']) 
+nplc.a <- exp(nc1$coefficients['(Intercept)'] + nc1$coefficients['visibleTrue'] + nc1$coefficients['treatment.aTRUE']) 
+nplc.a.upr <- exp(nc1$coefficients['(Intercept)'] + nc1$coefficients['visibleTrue'] + nc1$coefficients['treatment.aTRUE'] + 1.96 * nc1.sum$coefficients[,2]['treatment.aTRUE'])
+nplc.a.lwr <- exp(nc1$coefficients['(Intercept)'] + nc1$coefficients['visibleTrue'] + nc1$coefficients['treatment.aTRUE'] - 1.96 * nc1.sum$coefficients[,2]['treatment.aTRUE'])
+nplc.b <- exp(nc1$coefficients['(Intercept)'] + nc1$coefficients['visibleTrue'] + nc1$coefficients['treatment.bTRUE']) 
+nplc.b.upr <- exp(nc1$coefficients['(Intercept)'] + nc1$coefficients['visibleTrue'] + nc1$coefficients['treatment.bTRUE'] + 1.96 * nc1.sum$coefficients[,2]['treatment.bTRUE'])
+nplc.b.lwr <- exp(nc1$coefficients['(Intercept)'] + nc1$coefficients['visibleTrue'] + nc1$coefficients['treatment.bTRUE'] - 1.96 * nc1.sum$coefficients[,2]['treatment.bTRUE'])
+nplc.df <- data.frame(
+  exp.group = c("No Sticky Comment","Skepticism","Skepticism + Downvote"),
+  fit = c(nplc.c, nplc.a,nplc.b),
+  upr = c(nplc.c-0.01,nplc.a.upr, nplc.b.upr),
+  lwr = c(nplc.c-0.01, nplc.a.lwr, nplc.b.lwr),
+  g = c(0,1,2)
+)
+ggplot(nplc.df, aes(g,fit, fill=exp.group)) +
+  geom_bar(stat="identity") + 
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width=0.1) +
+  ylab("Linking Comment Incidence Rate") +
+  scale_fill_manual(values=cbbPalette, name="Experiment Arms",labels=nplc.df$exp.group) +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.title=element_text(size=11),
+        plot.title = element_text(size = 12, colour = "black", vjust = -1)) +
+  xlab(paste("Experiment by /u/CivilServantBot in r/worldnews. (n=", toString(nrow(posts)),")", sep="")) +
+  ggtitle(paste("Encouraging Fact-Checking Increases Linking Comments by ", toString(signif(exp(nc1$coefficients['treatment.aTRUE']), 3)), 
+          " to ", toString(signif(exp(nc1$coefficients['treatment.bTRUE']), 3)), "x", sep=""))
+````
+</center>
+
+While the bar chart shows a simple view of the effect, it doesn't communicate the fact that the effect is multiplacitive: on average, a post that would have had one comment with links now gets two, and a post that would have received 10 comments with links now gets twenty. To illustrate the effect across all levels of popularity, I simulated the distribution of comments with links that the model predicts, making it possible to compare the distribution of the control group to the different arms of the experiment:
+
+<center>
+```{r fig.width=9, fig.height=4, echo=TRUE}
+set.seed(807044)
+sim.n = 200
+nc1.ctl <- data.frame(sims = rnegbin(sim.n, c(exp(nc1$coefficients['(Intercept)'] + nc1$coefficients['visibleTrue'])) ,theta = nc1$theta))
+nc1.treatment.a  <- data.frame(sims = rnegbin(sim.n, c(exp(nc1$coefficients['(Intercept)'] + nc1$coefficients['visibleTrue'] +  nc1$coefficients['treatment.aTRUE'])) ,theta = nc1$theta))
+nc1.treatment.b  <- data.frame(sims = rnegbin(sim.n, c(exp(nc1$coefficients['(Intercept)'] + nc1$coefficients['visibleTrue'] +  nc1$coefficients['treatment.bTRUE'])) ,theta = nc1$theta))
+
+nc1.ctl$name <- "No Sticky Comment"
+nc1.treatment.a$name <- "Skepticism"
+nc1.treatment.b$name <- "Skepticism + Downvote"
+
+nc1.h <- rbind(nc1.treatment.a, nc1.treatment.b, nc1.ctl)
+
+ggplot(nc1.h, aes(sims, fill=name)) +
+  geom_histogram(position="dodge", bins=40) +
+  scale_fill_manual(values=cbbPalette, name="Experiment Arms") +
+  theme(axis.title=element_text(size=11),
+        plot.title = element_text(size = 12, colour = "black", vjust = -1)) +
+  ylab(paste("Times/", toString(sim.n), " for a # of Linking Comments", sep="")) +
+  xlab("Predicted Number of Comments with Links Per Discussion (simulated from model)") +
+  ggtitle(paste("Encouraging Fact-Checking Caused a ", toString(signif(exp(nc1$coefficients['treatment.aTRUE']), 3)*100), 
+                "% – ", toString(signif(exp(nc1$coefficients['treatment.bTRUE']), 3)*100), "% Higher Incidence of Comments with Links", sep=""))
+```
+</center>
+
 Why would we see such differences in the effect size between the model of comments and the model of posts? The reason is that the sticky commments didn't just *change* the content of comments -- they also increased the number of comments. When fact-check and non-fact-check comments increase alongside each other, the chance of any individual comment to include links grows more slowly. My [experiment pre-analysis plan](http://osf.io/knb48/) focused on the chance of comments to include links. In retrospect, I should probably have focused on the number of evidence-bearing comments in the discussion thread. The negative binomial model in the third column above is a good fit, and it stands a Bonferroni test for [multiple comparisons](https://en.wikipedia.org/wiki/Multiple_comparisons_problem), so I'm confident in both results.
 
 ### The Effect of Sticky Comments on Reddit's Algorithms
 
-<!--information about the dates and the numbers of observations. Mention what percentage of posts were covered by the experiment. Mention how many posts were removed by moderators and how many comments were removed by moderators.
+In this experiment, we expected that encouraging people to fact-check tabloid submissions would result in those submissions being promoted by reddit's algorithms. This could happen for two reasons: 
 
---> 
+* maybe reddit's score and HOT algorithm account for the commenting activity caused by the sticky comments
+
+* maybe the sticky comments cause changes in other behaviors that influence the score and HOT algorithm (voting, for example)
+
+While we cannot differentiate between these two kinds of factors, it may not matter so much for moderators, who care mostly about the overall outcome of the sticky notes being tested.
+
+#### Handling Changes in the reddit Algorithms on Dec 6, 2016
+On December 6 2016, the reddit platform [changed the scores they report on the site](https://www.reddit.com/r/announcements/comments/5gvd6b/scores_on_posts_are_about_to_start_going_up/), which had some effect on rankings. In this report, our main interest is the effect of the intervention after the change. Since we were running the experiment when the change occurred, I follow up with an analysis of what changed before and after reddit's announced transition in their algorithm. Companies rarely announce changes like this, so our data offers an extremely rare "natural experiment" on the effect of an algorithm change on the effect of an experiment.
+
+#### The Effect of Sticky Comments on The Score of a Submission, After the reddit Algorithm Change
+The following chart shows the distribution of log-transformed post scores after 24 hours for each arm of the experiment.
+
+<center>
+```{r fig.width=9, fig.height=4, echo=TRUE}
+ggplot(subset(posts, after.score.change==TRUE), aes(factor(post.treatment), log1p(snapshot.score), fill=factor(post.treatment))) + 
+  geom_violin() + 
+  theme(text = element_text(size=12), 
+        plot.title = element_text(size = 12)) + 
+  labs(x = "Experiment Arm",
+       y = "ln submission score after 24hrs") +
+  scale_fill_manual(values=cbbPalette, name="Experiment Arms",labels=c("No Sticky Comment", "Skepticism", "Skepticism + Downvote")) +
+  ggtitle(paste("Tabloid Submission Score after 24 Hours, r/worldnews, n=(",
+                toString( nrow(subset(posts, after.score.change==TRUE))),
+                ")", sep=""))
+````
+</center>
+
+To test the effect of sticky comments on the score of submissions after 24 hours, I fit a negative binomial model predicting the incidence rate of the score (Model 3):
+
+```{r, echo=TRUE, results='asis'}
+ans0 <- glm.nb(snapshot.score ~ 1, data=subset(posts, after.score.change==TRUE))
+ans1 <- glm.nb(snapshot.score ~ visible, data=subset(posts, after.score.change==TRUE))
+ans2 <- glm.nb(snapshot.score ~ visible + treatment.a + treatment.b, data=subset(posts, after.score.change==TRUE))
+ans3 <- glm.nb(snapshot.score ~ visible + treatment.a + treatment.b + visible:treatment.a + visible:treatment.b, data=subset(posts, after.score.change==TRUE))
+htmlreg(list(ans0, ans1, ans2,ans3), caption="Modeling Effect of Experiment on Tabloid Submission Score after 24 Hours, r/worldnews",custom.note="*** p < 0.001, ** p < 0.01, * p < 0.05")
+```
+
+When we designed the experiment, I thought that encouraging fact-checking would increase the score of a post and that adding an encouragment to downvote would limit that effect. I found the opposite to be true, shown in Model 3 in the above table. On average, **sticky comments encouraging fact-checking caused tabloid submissions to receive `r 100-signif(exp(ans2$coefficients['treatment.aTRUE']), 3)*100`% lower than submissions with no sticky comment**, an effect that is statistically-significant. Where sticky comments include an added encouragement to downvote, I did not find a statistically-significant effect.
+
+<center>
+```{r fig.width=9, fig.height=4, echo=TRUE}
+set.seed(807043)
+ctl <- data.frame(sims = rnegbin(200, c(exp(ans2$coefficients['(Intercept)'] + ans2$coefficients['visibleTrue'])) ,theta = ans2$theta))
+treatment.a  <- data.frame(sims = rnegbin(200, c(exp(ans2$coefficients['(Intercept)'] + ans2$coefficients['visibleTrue'] +  ans2$coefficients['treatment.aTRUE'])) ,theta = ans2$theta))
+ctl$name <- "No Sticky Comment"
+treatment.a$name <- "Encouraging Skepticism"
+ans2.h <- rbind(treatment.a, ctl)
+ggplot(ans2.h, aes(sims, fill=name)) +
+  geom_histogram(position="dodge", bins=25) +
+  theme(axis.title=element_text(size=11),
+        plot.title = element_text(size = 12, colour = "black", vjust = -1)) +
+  scale_fill_manual(values=c("#E69F00", "#000000"), name="Experiment Arms",labels=c("Skepticism", "No Sticky Comment")) +
+  ylab("Times/200 a Post Gets This Score") +
+  xlab("Predicted Score After 24 Hours (simulated from model)") +
+  ggtitle(paste("Encouraging Fact-Checking Caused Tabloid Submission Scores To Be ", toString(100-signif(exp(ans2$coefficients['treatment.aTRUE']), 3)*100), "% Lower", sep=""))
+````
+</center>
+<center>
+```{r fig.width=7, fig.height=3, echo=TRUE}
+ans2.sum <- summary(ans2)
+ans2.c <- exp(ans2$coefficients['(Intercept)'] + ans2$coefficients['visibleTrue'])
+ans2.a <- exp(ans2$coefficients['(Intercept)'] + ans2$coefficients['visibleTrue'] + ans2$coefficients['treatment.aTRUE'])
+ans2.a.upr <- exp(ans2$coefficients['(Intercept)'] + ans2$coefficients['visibleTrue'] + ans2$coefficients['treatment.aTRUE'] + 1.96 * ans2.sum$coefficients[,2]['treatment.aTRUE'])
+ans2.a.lwr <- exp(ans2$coefficients['(Intercept)'] + ans2$coefficients['visibleTrue'] + ans2$coefficients['treatment.aTRUE'] - 1.96 * ans2.sum$coefficients[,2]['treatment.aTRUE'])
+ans2.b <- exp(ans2$coefficients['(Intercept)'] + ans2$coefficients['visibleTrue'] + ans2$coefficients['treatment.bTRUE'])
+ans2.b.upr <- exp(ans2$coefficients['(Intercept)'] + ans2$coefficients['visibleTrue'] + ans2$coefficients['treatment.bTRUE'] + 1.96 * ans2.sum$coefficients[,2]['treatment.bTRUE'])
+ans2.b.lwr <- exp(ans2$coefficients['(Intercept)'] + ans2$coefficients['visibleTrue'] + ans2$coefficients['treatment.bTRUE'] - 1.96 * ans2.sum$coefficients[,2]['treatment.bTRUE'])
+ans2.df <- data.frame(
+  exp.group = c("No Sticky Comment","Skepticism","Skepticism + Downvote"),
+  fit = c(ans2.c, ans2.a,ans2.b),
+  upr = c(ans2.c-1,ans2.a.upr, ans2.b.upr),
+  lwr = c(ans2.c-1,ans2.a.lwr, ans2.b.lwr),
+  g = c(0,1,2)
+)
+ggplot(ans2.df, aes(g,fit, fill=exp.group)) +
+  geom_bar(stat="identity") + 
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width=0.1) +
+   ylab("Rate of 24 Hr Submission Score") +
+   scale_fill_manual(values=cbbPalette, name="Experiment Arms",labels=ans2.df$exp.group) +
+   theme(axis.text.x=element_blank(),
+         axis.ticks.x=element_blank(),
+         axis.title=element_text(size=11),
+         plot.title = element_text(size = 12, colour = "black", vjust = -1)) +
+   xlab(paste("Experiment by /u/CivilServantBot in r/worldnews. (n=", toString(length(ans2$residuals)),")", sep="")) +
+   ggtitle(paste("Encouraging Fact-Checking Decreases Tabloid Submission Scores by ",signif(1/exp(ans2$coefficients['treatment.aTRUE']), 3), 
+                 "x", sep=""))
+
+````
+</center>
+
+
+Why might encouraging downvotes eliminate the effect on submission scores? One likely answer is what psychologists call "reactance" -- it's possible that some people disliked the idea of moderators encouraging downvoting and decided to do the opposite.  
+
+After doing this analysis, I also wondered if we might be seeing this outcome because moderators were especially vigilant to remove low-quality tabloid posts throughout the experiment (see *"Did the experiment influence moderation of tabloid submissions"* and *"What Kinds of Submissions Did Moderators Remove and Allow to Remain"* below). If moderators were already removing the worst tabloid submissions, that might have affected the result. Across all tabloid submissions in the dataset after the algorithm change, `r signif(nrow(subset(posts, after.score.change==TRUE & visible=="True")) / nrow(subset(posts, after.score.change==TRUE))*100, 3)`% were allowed to remain by moderators. Model 4 in the above table checks this possibility. While our data doesn't allow us to test the effect of moderators removing posts, the main takeaway is that the difference in outcomes between the two sticky comments doesn't disappear when we control for different effects on visible and removed submissions.
+
+
+#### Did The Sticky Comments Have the Same Effect Before and After reddit's Algorithm Change?
+r/worldnews was lucky enough to have this experiment running before and after reddit's algorithm change, which allows a "natural experiment" comparing the effect of the sticky comments before and after it was made available. Compounding our luck, the change occurred right in-between two of the randomization blocks, so no observations have to be discarded.
+
+Since reddit changed how it calculates the score it shares publicly (including retroactive scores), it's important to use a number that is comparable across all submissions. For that reason, this analysis considers the score of a tabloid submission after 13,000 minutes, the point at which we have comparable scores across submissions before and after the change. I also trim more recent submissions that haven't been around long enough for us to sample at that age, omitting all randomization blocks where one or more post isn't old enough. The full subset includes `r nrow(subset(posts, later.score.interval.minutes >= 13000 & post.block.id!='block61'))` tabloid submissions that were at least 13,000 minutes old at the time of data collection:
+
+<center>
+```{r fig.width=9, fig.height=4, echo=TRUE}
+ggplot(subset(posts, later.score.interval.minutes >= 13000 &  post.block.id!='block61'), aes(after.score.change, log1p(later.score), fill=factor(post.treatment))) + 
+  theme(text = element_text(size=12), 
+        plot.title = element_text(size = 12)) + 
+  geom_violin() + 
+  labs(x = "Was the Post Submitted After 12/06/2016, when reddit Changed Algorithms?",
+       y = "ln score, sampled after 13k mins") +
+  scale_fill_manual(values=cbbPalette, name="Experiment Arms",labels=c("No Sticky Comment", "Skepticism", "Skepticism + Downvote")) +
+  ggtitle("The Effect Changed after a reddit Algorithm Change")
+```
+</center>
+
+To observe changes in the  effect of sticky comments on the score of submissions after 13,000 minutes, I fit a negative binomial model predicting the incidence rate of the score, before and after the change (Model 3):
+
+```{r, echo=TRUE, results='asis'}
+nsba0 <- glm.nb(snapshot.score ~ 1, data=subset(posts, later.score.interval.minutes >= 13000 &  post.block.id!='block61'))
+nsba1 <- glm.nb(snapshot.score ~ visible, data=subset(posts, later.score.interval.minutes >= 13000 &  post.block.id!='block61'))
+nsba2 <- glm.nb(snapshot.score ~ visible + treatment.a + treatment.b + after.score.change + after.score.change:treatment.a + after.score.change:treatment.b, data=subset(posts, later.score.interval.minutes >= 13000 &  post.block.id!='block61'))
+
+htmlreg(list(nsba0, nsba1, nsba2), caption="Modeling The Effect of Sticky Comments on Tabloid Submission Scores After 13,000 Minutes, Before And After Algorithm Changes, r/worldnews",  custom.note="*** p < 0.001, ** p < 0.01, * p < 0.05")
+
+```
+
+This model confirms what we see in the chart. Before the algorithm change, the effect of our sticky comments was exactly as we initially expected: encouraging fact-checking caused a `r signif(exp(nsba2$coefficients['treatment.aTRUE'])*100, 5)`% increase in the score of a tabloid submission compared to no sticky comment. Furthermore, encouraging downvoting did dampen that effect, with the second sticky causing only a `r signif(exp(nsba2$coefficients['treatment.bTRUE'])*100, 5)`% increase in the score of a comment after 13,000 minutes.
+
+After the algorithm change, the outcome of the experiment was very different, and the results are roughly consistent with the main finding: encouraging fact-checking caused a tabloid submission to receive `r signif(exp(nsba2$coefficients['treatment.aTRUE'] + nsba2$coefficients['treatment.aTRUE:after.score.changeTRUE'])*100, 3)`% the score compared to submissions with no sticky comment. In this model, encouraging downvotes had a statistically-significant effect, causing a `r signif(exp(nsba2$coefficients['treatment.bTRUE'] + nsba2$coefficients['treatment.bTRUE:after.score.changeTRUE'])*100, 4)`% increase in the score after 13,000 minutes. Why might encouraging downvotes have a statistically-significant effect in this model but not in the main model? One reason might be that this model has more observations; another might be that differences in the scores may be more apparent after many days rather than just 24 hours. For the purpose rankings, early differences in scores matter much more, so I wouldn't over-emphasize this finding. The main finding is the dramatic change in experiment effects before and after the algorithm change.
+
+With the data I have, I cannot conclusively prove that the algorithm change caused this change in experiment effects. It's possible that changes in the experiment effect may not result wholly from changes in the algorithm. For example, it's possible that the community needed a few weeks to settle into a typical response to sticky comments. We may be seeing differences between early reactions and ongoing reactions.
+
+Overall, this finding reminds us that **in complex socio-technical systems like platforms, algorithms and behavior can change in ways that completely overturn patterns of behavior that have been established experimentally**. As r/worldnews decides what to do in light of these results, they have the option to implement sticky comments with "audit randomizations" that warn them if the desired effect has changed. Another option is to use "contextual bandits" that adapt themselves to ever-evolving effects.
+
+#### The Effect of Sticky Comments On Rates of Change in Tabloid Submission Scores
+While observing a tabloid submission's score after 24 hours is a simple way to compare scores over time, it tells us very little about the effect of the sticky notes on scores in the earliest moments of a submission. But since CivilServant monitored the score of a submission every 4 minutes, we can observe the effect of our sticky comments on the growth curve of a submission's score over time. In the following models, I predict the log-transformed score of a post (after the algorithm change) at a moment in time. I also control for the visibility. In the models, statisticians will notice that the sticky comments don't have any effect on the score in these models. That's because the treatment coefficients predict differences in score for the very first snapshots, differences that are effectively 0. I set that up deliberatly so this model could focus on the the effect of a sticky comment on the growth curve of scores:
+
+
+```{r, echo=TRUE, results='asis'}
+clm1 <- lmer(log1p(score.score) ~ (1|id),data=subset(scores, after.score.change=TRUE))
+
+clm2 <- lmer(log1p(score.score) ~ score.age.minutes + I(score.age.minutes^2) + (1|id),data=subset(scores, after.score.change=TRUE))
+
+clm3 <- lmer(log1p(score.score) ~ score.age.minutes + I(score.age.minutes^2) +                       
+                      visible + 
+                      score.age.minutes:visible + 
+                      I(score.age.minutes^2):visible + (1|id),
+                    data=subset(scores, after.score.change=TRUE))
+
+clm4 <- lmer(log1p(score.score) ~ score.age.minutes + I(score.age.minutes^2) +                       
+                      visible + 
+                      score.age.minutes:visible + 
+                      I(score.age.minutes^2):visible + 
+                      factor(post.treatment) + (1|id),
+                    data=subset(scores, after.score.change=TRUE))
+
+clm5 <- lmer(log1p(score.score) ~ score.age.minutes + I(score.age.minutes^2) +
+                      visible + 
+                      score.age.minutes:visible + 
+                      I(score.age.minutes^2):visible +
+                      factor(post.treatment) + factor(post.treatment):score.age.minutes + 
+                      factor(post.treatment):I(score.age.minutes^2) + 
+                      (1|id),data=subset(scores, after.score.change=TRUE))
+
+htmlreg(list(clm1, clm2, clm3, clm4, clm5), caption="Modeling The Effect of Sticky Comments on the Growth Curve of log-transformed Tabloid Submission Scores At a Specific Time, r/worldnews", digits=4, custom.note="*** p < 0.001, ** p < 0.01, * p < 0.05")
+```
+<center>
+```{r fig.width=9, fig.height=4, echo=TRUE}
+m=clm5
+rm(cat1)
+rm(cg)
+
+cg = expand.grid(score.age.minutes = seq(min(scores$score.age.minutes), max(scores$score.age.minutes), 1),
+                 post.treatment = factor(c(0,1,2)), id=sample(scores$id, 1))
+
+cg$visible <- "True"
+cat1 <-predict(m, newdata=cg)#, conf.int=TRUE, se.fit=TRUE)
+# preds <- predictInterval(m, newdata = cg, n.sims = 999)
+# 
+# cg$upr <- preds$upr
+# cg$lwr <- preds$lwr
+cg$score <- cat1
+
+ggplot(cg, aes(x = score.age.minutes, y=exp(score), colour=post.treatment)) +
+  geom_line(data=cg,size = 1) +
+  theme(text = element_text(size=12), 
+        plot.title = element_text(size = 12)) + 
+  scale_colour_manual(values=cbbPalette, name="Experiment Arms",labels=c("No Sticky Comment", "Skepticism", "Skepticism + Downvote")) +
+  xlab("Minutes Since The Link Was Submitted") +
+  ylab("Predicted Score") +
+  ggtitle("Effect of Sticky Comments on the Growth Curve of Tabloid Submission Scores")
+````
+</center>
+
+As we see here, encouraging skepticism caused a tabloid submission's score to grow more slowly. Encouraging skepticism and downvoting may have increased the growth curve of tabloid submissions, on average on r/worldnews.
 
 ## Questions About The Experiment Results
 
@@ -179,61 +474,108 @@ Why would we see such differences in the effect size between the model of commen
 Throughout the experiment, submitted posts linking to these domains remained steady at a mean of `r signif(mean(posts.per.day$tabloid_pct)*100, 2)`% of all posts in the subreddit, even as the number of total submissions per day increased across the subreddit during the experiment.
 
 <center>
-```{r fig.width=7, fig.height=3, echo=FALSE}
+```{r fig.width=7, fig.height=3, echo=TRUE}
 ggplot(posts.per.day, aes(day, tabloid_pct, color=factor(after_experiment))) +
   geom_point() +
   ylim(0,1) +
-  scale_colour_discrete(name="Period",labels=c("Before Experiment", "During Experiment")) +
+  scale_colour_manual(values=cbbPalette, name="Period",labels=c("Before Experiment", "During Experiment")) +
   
   theme(axis.text.x = element_text(hjust=0, vjust=1, size=10), 
-        axis.title=element_text(size=14), 
+        axis.title=element_text(size=11), 
         #plot.margin = unit(c(1.5, 1, 1, 1), "cm"), 
-        plot.title = element_text(size = 14, colour = "black", vjust = -1)) +
-  labs(x = "ln Score After 24 Hours",
-       y = "ln Score After ~223 Hrs") +
+        plot.title = element_text(size = 12, colour = "black", vjust = -1)) +
+  labs(x = "Days",
+       y = "Tabloid Submissions Proportion") +
   ggtitle("Proportion of Tabloid Submissions to r/worldnews Over Time")
 ```
 </center>   
 
 ### Did The Experiment Influence Moderation of Tabloid Submissions?
-Moderators do appear to have adjusted their behavior towards the kinds of submissions we were observing, in the period just before we started the experiment. In this chart, you can see that in many cases, moderators allowed all tabloid submissions to remain, but that in the lead-up to the experiment start, when we were beta testing the software, they became more selective in what they permitted to remain.
+I was able to observe moderator action towards tabloid links in the period and during the experiment. While the acceptance rate for tabloid submissions has declined slightly, that change is in keeping with the overall increase in submissions that r/worldnews has received as its popularity has grown. 
 
 <center>
-```{r fig.width=7, fig.height=3, echo=FALSE}
+```{r fig.width=7, fig.height=3, echo=TRUE}
 ggplot(posts.per.day, aes(day, tabloid_kept, color=factor(after_experiment))) +
   geom_point() +
-  scale_colour_discrete(name="Period",labels=c("Before Experiment", "During Experiment")) +
-  
+  ylim(0,1) +
+  scale_colour_manual(values=cbbPalette, name="Period",labels=c("Before Experiment", "During Experiment")) +
   theme(axis.text.x = element_text(hjust=0, vjust=1, size=10), 
-        axis.title=element_text(size=14), 
+        axis.title=element_text(size=11), 
         #plot.margin = unit(c(1.5, 1, 1, 1), "cm"), 
-        plot.title = element_text(size = 14, colour = "black", vjust = -1)) +
-  labs(x = "ln Score After 24 Hours",
-       y = "ln Score After ~223 Hrs") +
+        plot.title = element_text(size = 12, colour = "black", vjust = -1)) +
+  labs(x = "Days",
+       y = "Tabloid Submissions Permitted") +
   ggtitle("Proportion of Tabloid Submissions Permitted by Moderators Over Time")
 ```
 </center> 
 
-Comparing the acceptance rate before and during the experiment, we see that the acceptance rate was lower during the experiment period:
+In the following model, I compare the acceptance rate before and during the experiment, controlling for wider changes in acceptance rates. I find no difference between tabloid acceptance rates before and during the experiment.
 
 ```{r, echo=TRUE, results='asis'}
-its <- lm(tabloid_kept ~ after_experiment, data=posts.per.day)
+posts.per.day$nontabloid.retained.pct <- (posts.per.day$total_retained - posts.per.day$tabloid_retained) / (posts.per.day$total - posts.per.day$tabloid)
+its <- lm(tabloid_kept ~ after_experiment + nontabloid.retained.pct, data=posts.per.day)
 htmlreg(list(its), caption="Modeling Proportion of Tabloid Posts Kept by Moderators",custom.note="*** p < 0.001, ** p < 0.01, * p < 0.05")
 ```
 
-On average, after the start of the experiment, a tabloid submission had a `r signif(its$coefficients['after_experiment']*100, 3)`% smaller chance of being allowed to remain by moderators, a relationship that is statistically significant. 
-
-However, I did not find an effect of the sticky comments on the chance of a link being allowed to remain. I expected that if people did more fact-checking, they might discover problems with links and alert moderators, resulting in the removal of unreliable links. This did not occur, perhaps because moderators were especially vigilant and consistent in their application of the rules. In the following model, we fail to find a causal relationship between the sticky notes and the chance of a post being allowed to remain by moderators.
+I also did not find an effect of the sticky comments on the chance of a link being allowed to remain. I expected that if people did more fact-checking, they might discover problems with links and alert moderators, resulting in the removal of unreliable links. This did not occur, perhaps because moderators were especially vigilant and consistent in their application of the rules. In the following model, I fail to find a causal relationship between the sticky notes and the chance of a post being allowed to remain by moderators.
 
 ```{r, echo=TRUE, results='asis'}
 btvs1 <- glm(visible ~ factor(post.treatment), data = posts, family=binomial)
 htmlreg(list(btvs1), caption="Modeling Post Visibility", custom.note="*** p < 0.001, ** p < 0.01, * p < 0.05")
 ```
 
+### What Kinds of Submissions Did Moderators Remove or Allow to Remain?
+r/worldnews moderators remove submissions for many reasons ([read the r/worldnews rules for more details](https://www.reddit.com/r/worldnews/wiki/rules#wiki_disallowed_submissions). To show what gets removed, I show ten randomly-sampled headlines from tabloid sites that were removed by moderators during the experiment, as well as ten that were allowed to remain:
+
+* This is a random sample, which offers a somewhat representative, if small picture of the whole
+* While these headlines are representative of links to tabloid domains, they represent a very small percentage of what gets removed overall
+* Many submisions are removed just for being duplicates
+
+
+#### Removed Submissions
+
+* [*Opinion/Analysis*] ‘Are we living in Nazi Germany?’
+* [*Covered by other articles*] Chinese War Ship Seizes U. S. Navy Drone In South China Sea
+* [*Covered by other articles*] Plane with Brazilian football team crashes with 81 people on board, only 5 people have survived.
+* [*Misleading Title*] ISIS claims responsibility for Berlin Christmas market attack
+* [*Covered by other articles*] Russian ambassador to Turkey seriously injured after being shot in 'assassination attempt'
+* [*US internal news*] IBM unveils plan to hire 25,000 in US on eve of Trump meeting
+* [*Misleading Title*] Bavaria passes new law to make migrants respect 'dominant' local culture
+* [*Misleading Title | Not Appropriate Subreddit*] Spanish Terror Attack: Gunman enters supermarket, shouts Allahu Akbar
+* [*Editorialized Title*] A last kiss for mama: Jihadi parents bid young daughters goodbye... before one walks into a Damascus police station and is blown up by remote detonator
+* [*Opinion/Analysis*] Driver of lorry hijacked for Berlin attack was ALIVE during Christmas Market rampage and fought with ISIS fanatic, autopsy suggests.
+
+#### Allowed Submissions
+Many articles from these sources include reporting of a kind that moderators allow. Here are ten randomly sampled headlines from tabloid sites that were permitted to remain by moderators:
+
+* 3 Brazilian inmates beheaded as drug gangs continue to clash in prisons
+* 2k-year-old lead tablets found in remote cave ARE genuine, claim researchers
+* Istanbul shooting: Two gunmen open fire on Turkish restaurant
+* China’s secret missile plan for South China Sea
+* Ex-British spy behind Trump dossier has been identified
+* David Cameron lined up to become the next Nato Secretary General
+* New ISIS spokesman urges ISIS supporters to attack Turkish military, economic & media targets, as well as its embassies around the world
+* X Factor star makes £131 busking - then gives the cash to shivering homeless man
+* China sends aircraft carrier to South China Sea; Taiwan says 'the threat of our enemies is growing day by day'
+* School in Taiwan is condemned after students wave Nazi flags and shout 'Sieg Heil' while their teacher stands in a cardboard tank and salutes them
+
 ### Who Did The Fact-Checking?
+Of 930 non-bot comments with links that were allowed to remain by moderators, 737 were made by unique commenters. Out of these, 133 made more than one comment with links. Many participants fact-checked their own stories; with authors posting 81 comments with further links.
+
+## TLDR Summary Of Outcomes
+
+* Posting a sticky comment **encouraging skepticism caused a comment to be `r signif((fp.a - fp.0)*100, 3)` percentage points more likely to include at least one link**.  Posting a sticky comment **encouraging skepticism and discerning downvotes caused a comment to be `r signif((fp.b - fp.0)*100, 3)` percentage points more likely to include at least one link**. Both results are statistically significant.
+
+* Within discussions of tabloid submissions on r/worldnews, **encouraging skeptical links increases the incidence rate of link-bearing comments by `r signif(exp(nc1$coefficients['treatment.aTRUE'])*100, 3)`% on average**, and the sticky **encouraging skepticism and downvotes increases the incidence rate by `r signif(exp(nc1$coefficients['treatment.bTRUE'])*100, 3)`% on average**.
+
+* On average, **sticky comments encouraging fact-checking caused tabloid submissions to receive `r signif(exp(ans2$coefficients['treatment.aTRUE']), 3)*100`% the score of submissions with no sticky comment**, an effect that is statistically-significant. Where sticky comments include an added encouragement to downvote, I did not find a statistically-significant effect.
+
+* **Encouraging skepticism caused a tabloid submission's score to grow more slowly.** Encouraging skepticism and downvoting may have very very slightly increased the growth curve of tabloid submissions, on average on r/worldnews.
+
+* Changes in the reddit algorithm can reverse the effects of a sticky comment in a subreddit.
 
 ## Acknowledgments
-Many people have made this experiment possible. Merry Mou wrote much of the CivilServant code along with me. r/worldnews suggested the unreliable news experiment in the first place. Thanks everyone!
+Many people have made this experiment possible. Merry Mou wrote much of the CivilServant code along with me. r/worldnews suggested the unreliable news experiment in the first place. Martin Saveski offered feedback on the statistical analysis in this document. Thanks everyone!
 
 ## References
 
@@ -244,3 +586,5 @@ Many people have made this experiment possible. Merry Mou wrote much of the Civi
 [3] Alan S. Gerber and Donald P. Green. *Field Experiments: Design, Analysis, and Interpretation.* WW Norton, 2012
 
 [4] Glenski, M., & Weninger, T. (2016). Rating Effects on Social News Posts and Comments. arXiv preprint arXiv:1606.06140.
+
+[5] Massanari, A. (2015). # Gamergate and The Fappening: How Reddit’s algorithm, governance, and culture support toxic technocultures. New Media & Society, 1461444815608807.
