@@ -75,7 +75,7 @@ In our discussion with r/politics community members, we heard worries that days 
 
 * **Politically-commenting account**: 10% or more of their posts or comments in 2017 before July 31 were posted in any political subreddit other than r/politics [our list](https://docs.google.com/spreadsheets/d/e/2PACX-1vQMSxnq4r12fzPwiYd8DtKzdubaF1si52GFHjujDmIQGAnXYGTVJPIOClcNjbqVurZ5FjtjP9hlbHB4/pubhtml) was based on the r/politics [list of political subreddits](https://www.reddit.com/r/politics/wiki/relatedsubs). `r sprintf("%1.1f", nrow(subset(user.politics,pct.politics >0.1))/nrow(user.politics)*100)`% of r/politics in that period were classified this way.
 * **Left-leaning account**: They are a politically-commenting account and 10% or more of their political posts/comments were in US left-leaning subreddits. 
-* **Right-leaning account**: They are a politically-commenting account and 10% or more of their political posts/comments were in US left-leaning subreddits
+* **Right-leaning account**: They are a politically-commenting account and 10% or more of their political posts/comments were in US right-leaning subreddits
 * **The_Donald -leaning account**: They are a politically-commenting account and 10% of their political posts/comments were in [subreddits identified as related to The_Donald in algorithms by Trevor Martin](http://www.shorttails.io/interactive-map-of-reddit-and-subreddit-similarity-calculator/). These subreddits are 'conservative', 'asktrumpsupporters', 'hillaryforprison', 'uncensorednews', 'askthe_donald', 'libertarian', 'mr_trump', and 'conspiracy'.
 
 We then combined these into measures of the number and percentage of politically-related comments made per day.
@@ -382,6 +382,9 @@ We hope that this report can guide future research that tests the social impact 
 * Develop more nuanced measures of unruly behavior
 * Measure a larger sample of comment scores on an ongoing basis
 * Consider using a regression discontinuity design to look at the effect among comments that cross the line into having a negative score, compared to ones that just barely stay positive (We're very hopeful about this)
+
+# Authorship Contributions
+This study was designed in conversation among J. Nathan Matias, Cliff Lampe, Justin Cheng, and Mason English. Nathan Matias wrote the software, conducted the data analysis, wrote this report. Any errors are my own.
 
 # References
 Cheng, J., Danescu-Niculescu-Mizil, C., & Leskovec, J. (2014). How community feedback shapes user behavior. arXiv preprint arXiv:1405.1429.

@@ -11,7 +11,7 @@
 
 <meta name="author" content="J. Nathan Matias (blog) (/u/natematias) (twitter)." />
 
-<meta name="date" content="2018-01-05" />
+<meta name="date" content="2018-01-06" />
 
 <title>Does Hiding Downvotes Improve Behavior in r/politics?</title>
 
@@ -192,7 +192,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">Does Hiding Downvotes Improve Behavior in r/politics?</h1>
 <h4 class="author"><em>J. Nathan Matias (<a href="https://civic.mit.edu/blog/natematias">blog</a>) (<a href="https://reddit.com/u/natematias">/u/natematias</a>) (<a href="https://twitter.com/natematias">twitter</a>).</em></h4>
-<h4 class="date"><em>January 05, 2018</em></h4>
+<h4 class="date"><em>January 06, 2018</em></h4>
 
 </div>
 
@@ -211,6 +211,7 @@ $(document).ready(function () {
 <li><a href="#limitations">Limitations</a></li>
 <li><a href="#so-should-my-subreddit-hide-downvotes">So Should My Subreddit Hide Downvotes?</a></li>
 <li><a href="#how-can-we-study-this-better-in-the-future">How Can We Study This Better in the Future?</a></li>
+<li><a href="#authorship-contributions">Authorship Contributions</a></li>
 <li><a href="#references">References</a></li>
 </ul>
 </div>
@@ -257,7 +258,7 @@ $(document).ready(function () {
 <ul>
 <li><strong>Politically-commenting account</strong>: 10% or more of their posts or comments in 2017 before July 31 were posted in any political subreddit other than r/politics <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vQMSxnq4r12fzPwiYd8DtKzdubaF1si52GFHjujDmIQGAnXYGTVJPIOClcNjbqVurZ5FjtjP9hlbHB4/pubhtml">our list</a> was based on the r/politics <a href="https://www.reddit.com/r/politics/wiki/relatedsubs">list of political subreddits</a>. 9.1% of r/politics in that period were classified this way.</li>
 <li><strong>Left-leaning account</strong>: They are a politically-commenting account and 10% or more of their political posts/comments were in US left-leaning subreddits.</li>
-<li><strong>Right-leaning account</strong>: They are a politically-commenting account and 10% or more of their political posts/comments were in US left-leaning subreddits</li>
+<li><strong>Right-leaning account</strong>: They are a politically-commenting account and 10% or more of their political posts/comments were in US right-leaning subreddits</li>
 <li><strong>The_Donald -leaning account</strong>: They are a politically-commenting account and 10% of their political posts/comments were in <a href="http://www.shorttails.io/interactive-map-of-reddit-and-subreddit-similarity-calculator/">subreddits identified as related to The_Donald in algorithms by Trevor Martin</a>. These subreddits are ‘conservative’, ‘asktrumpsupporters’, ‘hillaryforprison’, ‘uncensorednews’, ‘askthe_donald’, ‘libertarian’, ‘mr_trump’, and ‘conspiracy’.</li>
 </ul>
 <p>We then combined these into measures of the number and percentage of politically-related comments made per day.</p>
@@ -302,7 +303,7 @@ $(document).ready(function () {
 <div id="did-hiding-downvotes-increase-comments-and-comment-removals" class="section level3">
 <h3>Did Hiding Downvotes Increase Comments and Comment Removals?</h3>
 <p>In discussions, many people expected that hiding downvotes would substantially increase the number of commenters, and that it would increase work for moderators. We tested this by counting the number of comments made in a given day and fitting a series of linear regressions that estimated the log-transformed number of comments and number of comments removed. We tested models that controlled for whether the day had a special kind of thread scheduled, as well as the number of posts that appeared on the front page that day. We also tested an additional model that controlled for the number of posts in that day.</p>
-<p>We found that while it’s possible that hiding downvotes may have caused a 17.2% increase in the number of comments per day on average in r/politics, that difference disappears when we control for the number of posts per day. We failed to distinguish any difference in comments removed from chance.</p>
+<p>We found that while it’s possible that hiding downvotes may have caused a 17.2% increase in the number of comments per day on average in r/politics, that difference disappears when we control for the number of posts per day. We failed to distinguish from chance any difference in the number of comments removed per day, on average.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">ncm0 &lt;-<span class="st"> </span><span class="kw">robcov</span>(<span class="kw">ols</span>(<span class="kw">log1p</span>(num.comments) ~<span class="st"> </span>TREAT +<span class="st"> </span>day.type +<span class="st"> </span>num.posts.front.page, <span class="dt">data=</span>experiment.days, <span class="dt">x=</span>T,<span class="dt">y=</span>T),<span class="dt">cluster=</span>experiment.days$TREAT.day.id)
 ncm1 &lt;-<span class="st"> </span><span class="kw">robcov</span>(<span class="kw">ols</span>(<span class="kw">log1p</span>(num.comments) ~<span class="st"> </span>TREAT +<span class="st"> </span><span class="kw">log1p</span>(num.posts) +<span class="st"> </span>day.type +<span class="st"> </span>num.posts.front.page, <span class="dt">data=</span>experiment.days, <span class="dt">x=</span>T,<span class="dt">y=</span>T),<span class="dt">cluster=</span>experiment.days$TREAT.day.id)
 ncrm0 &lt;-<span class="st"> </span><span class="kw">robcov</span>(<span class="kw">ols</span>(<span class="kw">log1p</span>(num.comments.removed) ~<span class="st"> </span>TREAT +<span class="st"> </span>day.type +<span class="st"> </span>num.posts.front.page, <span class="dt">data=</span>experiment.days, <span class="dt">x=</span>T,<span class="dt">y=</span>T),<span class="dt">cluster=</span>experiment.days$TREAT.day.id)
@@ -1233,6 +1234,10 @@ L.R.
 <li>Measure a larger sample of comment scores on an ongoing basis</li>
 <li>Consider using a regression discontinuity design to look at the effect among comments that cross the line into having a negative score, compared to ones that just barely stay positive (We’re very hopeful about this)</li>
 </ul>
+</div>
+<div id="authorship-contributions" class="section level1">
+<h1>Authorship Contributions</h1>
+<p>This study was designed in conversation among J. Nathan Matias, Cliff Lampe, Justin Cheng, and Mason English. Nathan Matias wrote the software, conducted the data analysis, wrote this report. Any errors are my own.</p>
 </div>
 <div id="references" class="section level1">
 <h1>References</h1>
