@@ -25,40 +25,40 @@ critval.3 <- 2.398
 ### LOAD DATASETS
 
 ### LOAD COMMENTS DATASET
-exs.comments <- read.csv("experiments/r_science_comments_science_sticky_09.24.2016.toptime.csv")
+exs.comments <- read.csv("r_science_comments_science_sticky_09.24.2016.toptime.csv")
 exs.comments= subset(exs.comments, post.block.id!="nonama.block058")
 exs.comments= subset(exs.comments, post.block.id!="nonama.block222")
 exs.comments = subset(exs.comments, post.block.id!="nonama.block037")
 
-exs.comments$datetime <-  as.POSIXct(exs.comments$created)
-exs.comments$hour <- hour(exs.comments$datetime)
-exs.comments$post.ama <- exs.comments$post.ama=="True"
-
-exs.comments$post.datetime <- as.POSIXct(exs.comments$post.created)
-exs.comments$post.hour <- hour(exs.comments$post.datetime)
-
-exs.comments$post.sub.top.minutes.ln <- log1p(exs.comments$post.sub.top.minutes)
-exs.comments$post.sub.top.gap.sum.ln <- log1p(exs.comments$post.sub.top.gap.sum)
+exs.comments <- exs.comments[,c("visible", "author.prev.comments", "link_id", "post.ama", "post.treatment", "post.visible", "post.sub.top.minutes.ln", "post.block.id")]
 
 ## CREATE DATASET OF NEWCOMER COMMENTS
 newcomer.comments <- subset(exs.comments, author.prev.comments ==0)
 
+### ONLY RETAIN COLUMNS USED IN THE ANALYSIS
+
+
 ### LOAD POSTS DATASET
-all.posts <- read.csv("experiments/r_science_experiment_1_posts.09.26.2016.csv")
+all.posts <- read.csv("r_science_experiment_1_posts.09.26.2016.csv")
+
+all.posts <- all.posts[,c("newcomer.comments", "newcomer.comments.removed", "visible", "post.ama", "sub.top.minutes", "block.id", "created", "treatment", "weekend", "post.flair")]
+
+#newcomer.comments ~ visible.bool + post.ama +  post.sub.top.minutes.ln + post.flair + weekend.bool + post.hour + I(post.hour^2) + TREAT
+
 exs.posts <- all.posts
 exs.posts$post.sub.top.minutes.ln <- log1p(exs.posts$sub.top.minutes)
 exs.posts$datetime <-  as.POSIXct(exs.posts$created)
 exs.posts$post.hour <- hour(exs.posts$datetime)
 
-exs.posts$nonreply.newcomer.comments <- exs.posts$newcomer.comments - exs.posts$newcomer.comments.experiment.replies
 exs.posts$TREAT <- exs.posts$treatment
-exs.posts$post.ama <- exs.posts$post.ama=="True"
 
 exs.posts <- subset(exs.posts, block.id!="nonama.block222")
 exs.posts <- subset(exs.posts, block.id!="nonama.block058")
 exs.posts <- subset(exs.posts, block.id!="nonama.block037")
 exs.posts$visible.bool <- exs.posts$visible=="True"
 exs.posts$weekend.bool <- exs.posts$weekend =="True"
+
+
 
 ######### H1: AVERAGE TREATMENT EFFECT ON CHANCE OF COMPLYING WITH THE RULES
 ccv5 <- glmer(visible ~ post.visible + post.ama + post.sub.top.minutes.ln + post.treatment + (1 | link_id), data = newcomer.comments, family = binomial, nAGQ=20)
@@ -109,7 +109,7 @@ ggplot(h1.effect, aes("H1", fit)) +
         axis.title =  element_text(hjust=0, vjust = 0, angle=0)) +
   ylab(paste("Effect of posting rules on the log-odds of a newcomer comment to be removed\n",
              "by moderators in r/science community from 08/25/2016 - 09/23/2016.\n", 
-             "n = ", nrow(newcomer.comments), " newcomers, ", nrow(exs.posts), " posts, in a random intercepts binomial model (p=", 
+             "n = ", nrow(newcomer.comments), " newcomers, ", nrow(exs.posts), " posts, in a random intercepts logistic regression (p=", 
              sprintf("%0.03f", h1.p), ").", sep="")) +
   annotate("text", label = "A. Effect on Log-Odds of Newcomer Rule Compliance",
            x = 1.4, y = 0, hjust = 0, size=6) +
@@ -131,6 +131,10 @@ treat_prob = 1/(1+exp(-1 *(h1.summary$coefficients['(Intercept)',]['Estimate'] +
                              h1.summary$coefficients['post.visibleTrue',]['Estimate'] + 
                              h1.summary$coefficients['post.treatment',]['Estimate'])))
 treat_prob
+
+bp2 = 1/(1+exp(-1 *(h1.summary$coefficients['(Intercept)',]['Estimate'] + 
+                      h1.summary$coefficients['post.visibleTrue',]['Estimate'])))
+
 
 h1.prob.effect <- treat_prob - baseline_prob
 h1.prob.effect
@@ -165,6 +169,7 @@ hist(exs.posts$post.hour)
 #### MODEL H2: The Number of Newcomer Comments removed Per Post
 summary(zcm2 <- zeroinfl(newcomer.comments.removed ~ visible.bool + post.ama +  post.sub.top.minutes.ln + post.flair + weekend.bool + post.hour + I(post.hour^2) + TREAT | visible.bool + post.sub.top.minutes.ln, data=exs.posts))
 
+
 #### MODEL H3: The Number of Newcomers Per Post
 summary(zcm3 <- zeroinfl(newcomer.comments ~ visible.bool + post.ama +  post.sub.top.minutes.ln + post.flair + weekend.bool + post.hour + I(post.hour^2) + TREAT | visible.bool + post.sub.top.minutes.ln, data=exs.posts))
 
@@ -184,16 +189,16 @@ screenreg(list(zcm2, zcm3),
 )
 
 texreg(list(zcm2, zcm3),       
-          custom.coef.names = c("(Intercept)", "Post Visible", "Live Q\\&A (AMA)", "Minutes in Top 5", 
-                                "Topic: animalsci", "Topic: anthropology", "Topic: Astronomy", 
-                                "Topic: Biology", "Topic: Cancer", "Topic: Chemistry", "Topic: Compsci", 
-                                "Topic: Earth Science", "Topic: Engineering", "Topic: Environment",
-                                "Topic: Epidemiology", "Topic: Geology", "Topic: Health", "Topic: Math",
-                                "Topic: Medicine", "Topic: Meta", "Topic: Nanotech", "Topic: Neuroscience",
-                                "Topic: Paleontology", "Topic: Physics", "Topic: Psychology", "Topic: Sociology",
-                                "Weekend", "Post Hour", "Post Hour ^2", "Treatment", 
-                                "Zero: (Intercept)", "Zero: Post Visible", "Zero: Minutes in Top 5"),
-          custom.model.names = c("Newcomer Comments Removed", "Newcomer Comment Count")
+       custom.coef.names = c("(Intercept)", "Post Visible", "Live Q\\&A (AMA)", "Minutes in Top 5", 
+                             "Topic: animalsci", "Topic: anthropology", "Topic: Astronomy", 
+                             "Topic: Biology", "Topic: Cancer", "Topic: Chemistry", "Topic: Compsci", 
+                             "Topic: Earth Science", "Topic: Engineering", "Topic: Environment",
+                             "Topic: Epidemiology", "Topic: Geology", "Topic: Health", "Topic: Math",
+                             "Topic: Medicine", "Topic: Meta", "Topic: Nanotech", "Topic: Neuroscience",
+                             "Topic: Paleontology", "Topic: Physics", "Topic: Psychology", "Topic: Sociology",
+                             "Weekend", "Post Hour", "Post Hour ^2", "Treatment", 
+                             "Zero: (Intercept)", "Zero: Post Visible", "Zero: Minutes in Top 5"),
+       custom.model.names = c("Newcomer Comments Removed", "Newcomer Comment Count")
 )
 
 ### NOW WITHOUT ADJUSTING FOR THE ALGORITHM
@@ -211,7 +216,6 @@ texreg(list(zcm2.a, zcm3.a),
                              "Zero: (Intercept)", "Zero: Post Visible"),
        custom.model.names = c("Newcomer Comments Removed", "Newcomer Comment Count")
 )
-
 
 #### GENERATE CONFIDENCE INTERVALS AND PLOTS
 ## USE IRR, which is exp(coefficient +- confint)
@@ -239,8 +243,7 @@ ggplot(h2.effect, aes("H2", fit)) +
         axis.title =  element_text(hjust=0, vjust = 0, angle=0)) +
   ylab(paste("Effect of posting rules on incidence rate of number of newcomer comments removed\n",
              "by moderators in r/science community from 08/25/2016 - 09/23/2016.\n", 
-             "n = ", nrow(newcomer.comments), " newcomers, ", nrow(exs.posts), " posts, in a zero-inflated poisson model (p=", 
-             sprintf("%0.03f", h2.p), ").", sep="")) +
+             "n = ", nrow(newcomer.comments), " newcomers, ", nrow(exs.posts), " posts, in a zero-inflated poisson model (p < 0.0001).", sep="")) +
   annotate("text", label = "C. Effect on Incidence Rate of Newcomer Comment Removals",
            x = 1.4, y = 1, hjust = 0, size=6) +
   #ggtitle("Posting Rules Increases the Rate of Newcomer Comment Removals") +
@@ -271,8 +274,7 @@ ggplot(h3.effect, aes("H3", fit)) +
         axis.title =  element_text(hjust=0, vjust = 0, angle=0)) +
   ylab(paste("Effect of posting rules on incidence rate of number of newcomer comments\n",
              "by moderators in r/science community from 08/25/2016 - 09/23/2016.\n", 
-             "n = ", nrow(newcomer.comments), " newcomers, ", nrow(exs.posts), " posts, in a zero-inflated poisson model (p < ", 
-             sprintf("%0.03f", h3.p), ").", sep="")) +
+             "n = ", nrow(newcomer.comments), " newcomers, ", nrow(exs.posts), " posts, in a zero-inflated poisson model (p < 0.0001).", sep="")) +
   annotate("text", label = "B. Effect on Incidence Rate of Newcomer Comments",
            x = 1.4, y = 1, hjust = 0, size=6) +
   #ggtitle("Posting Rules Increases the Incidence Rate of Newcomer Comments") +
@@ -282,48 +284,19 @@ ggplot(h3.effect, aes("H3", fit)) +
 ###### CHECK THE BALANCE OF THE SAMPLE
 summary(glm(treatment ~ post.flair + post.sub.top.minutes.ln, family="binomial", data=exs.posts))
 
-summary(glm(treatment ~ factor(weekday), family="binomial", data=subset(exs.posts, post.ama==TRUE)))
+#summary(glm(treatment ~ factor(weekday), family="binomial", data=subset(exs.posts, post.ama==TRUE)))
 
 
 ########################################
 ## OUTPUT RESULTS TO RData File For Paper
 ########################################
-rm(ccv1,ccv2,ccv3, ccv4, ccv5)
-rm(m1,m2,mmmm1, nb1,nb2,nb3, occv1, occv2, occv3, occv4, occv5, occv6)
-rm(ozcm1, ozcm2, ozcm3, ozcm4, ozcrm1, ozcrm2, ozcrm3, ozcrm4)
-rm(tcnb, tcnb1, tcnb2, tcnb3, tcnb4, tcnb5, tcnb6)
-rm(zcm1, zcm2, zcm3, zcm4)
-rm(nc)
-
-all.posts$media <- NULL
-exs.posts$media <- NULL
-all.posts$media_embed <- NULL
-exs.posts$media_embed <- NULL
-all.posts$selftext <- NULL 
-exs.posts$selftext <- NULL 
-all.posts$selftext_html <- NULL
-exs.posts$selftext_html <- NULL
-all.posts$permalink <- NULL
-exs.posts$permalink <- NULL
-all.posts$user_repots <- NULL
-exs.posts$user_reports <- NULL
-all.posts$mod_reports <- NULL
-exs.posts$mod_reports <- NULL
-all.posts$url <- NULL
-exs.posts$url <- NULL
-all.posts$clicked <- NULL
-exs.posts$clicked <- NULL
-all.posts$suggested_sort <- NULL
-exs.posts$suggested_sort <- NULL
-all.posts$archived <- NULL
-exs.posts$archived <- NULL
-newcomer.comments$post.badpost <- NULL
-exs.comments$post.badpost <- NULL
+rm(ccv5, ccv6)
+rm(zcm2,zcm2.a, zcm3, zcm3.a)
 
 ##################################################################
 ### LOAD PRE-EXPERIMENT OBSERVATIONAL DATA FOR EXPLAINING CONTEXT
 ##################################################################
-pre.posts <- read.csv("~/Documents/github/CivilServant-Analysis/outputs/r_science_posts_2016.07.04_04.45.23-2016.08.01_22.14.00.csv")
+pre.posts <- read.csv("r_science_posts_2016.07.04_04.45.23-2016.08.01_22.14.00.csv")
 pre.posts$title <- NULL
 pre.posts$approved_by <- NULL
 pre.posts$banned_by <- NULL
@@ -383,8 +356,7 @@ pre.posts$suggested_sort <- NULL
 pre.posts$ups <- NULL
 pre.posts$url <- NULL
 
-
-## percentage of newcomer comments
+## summary statistics 
 max(pre.posts$created_utc) 
 
 min(pre.posts$created_utc)
@@ -393,17 +365,14 @@ signif(sum(pre.posts$newcomer.comments.removed) / as.numeric(max(pre.posts$creat
 
 signif(sum(pre.posts$newcomer.comments) / as.numeric(max(pre.posts$created_utc)- min(pre.posts$created_utc), units = "days"), 3)
 
-
 sum(pre.posts$num.comments.removed) / as.numeric(max(pre.posts$created_utc)- min(pre.posts$created_utc), units = "days")
 
 nrow(pre.posts) / as.numeric(max(pre.posts$created_utc)- min(pre.posts$created_utc), units = "days")
-
 
 signif(sum(pre.posts$newcomer.comments) / sum(pre.posts$num_comments)*100, 3)
 
 ## percentage of removed newcomer comments of a ll removed
 signif(sum(pre.posts$newcomer.comments.removed) / sum(pre.posts$num.comments.removed)*100, 3)
-
 
 ### OUTPUT  TO FILE
 rdata_filename <- paste("r_science_experiment_results_", format(min(exs.posts$datetime),"%m.%d.%Y"), "-",
