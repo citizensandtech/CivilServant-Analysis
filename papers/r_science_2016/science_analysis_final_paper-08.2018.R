@@ -169,9 +169,19 @@ hist(exs.posts$post.hour)
 #### MODEL H2: The Number of Newcomer Comments removed Per Post
 summary(zcm2 <- zeroinfl(newcomer.comments.removed ~ visible.bool + post.ama +  post.sub.top.minutes.ln + post.flair + weekend.bool + post.hour + I(post.hour^2) + TREAT | visible.bool + post.sub.top.minutes.ln, data=exs.posts))
 
+summary(cm2.p <- glm(newcomer.comments.removed ~ TREAT + visible.bool + post.ama, family=poisson, data=exs.posts))
+
+### Followup Negative Binomial Model
+summary(cm2.nb <- glm.nb(newcomer.comments.removed ~ TREAT + visible.bool + post.ama + weekend.bool + post.hour + I(post.hour^2), data=exs.posts))
+cm2.nb.pvalue <- p.adjust(summary(cm2.nb)$coefficients['TREAT',][['Pr(>|z|)']], n=5, method="bonferroni")
 
 #### MODEL H3: The Number of Newcomers Per Post
 summary(zcm3 <- zeroinfl(newcomer.comments ~ visible.bool + post.ama +  post.sub.top.minutes.ln + post.flair + weekend.bool + post.hour + I(post.hour^2) + TREAT | visible.bool + post.sub.top.minutes.ln, data=exs.posts))
+summary(cm3.p <- glm(newcomer.comments ~ TREAT + visible.bool + post.ama, family=poisson, data=exs.posts))
+
+## Followup Negative Binomial Model
+summary(cm3.nb <- glm.nb(newcomer.comments ~ TREAT + visible.bool + post.ama + weekend.bool + post.hour + I(post.hour^2), data=exs.posts))
+cm3.nb.pvalue <- p.adjust(summary(cm3.nb)$coefficients['TREAT',][['Pr(>|z|)']], n=5, method="bonferroni")
 
 stargazer(zcm2, zcm3, type="text", star.cutoffs = c(0.05, 0.01, 0.001), ci=c(TRUE, TRUE))
 screenreg(list(zcm2, zcm3))
@@ -215,6 +225,20 @@ texreg(list(zcm2.a, zcm3.a),
                              "Weekend", "Post Hour", "Post Hour ^2", "Treatment", 
                              "Zero: (Intercept)", "Zero: Post Visible"),
        custom.model.names = c("Newcomer Comments Removed", "Newcomer Comment Count")
+)
+
+## NOW THE NEGATIVE BINOMIAL MODELS
+screenreg(list(cm2.nb, cm3.nb))
+screenreg(list(cm2.nb, cm3.nb),       
+          custom.coef.names = c("(Intercept)", "Treatment",  "Post Visible", "Live Q\\&A (AMA)", 
+                                "Weekend", "Post Hour", "Post Hour ^2"),
+          custom.model.names = c("Newcomer Comments Removed", "Newcomer Comment Count")
+)
+
+texreg(list(cm2.nb, cm3.nb),       
+          custom.coef.names = c("(Intercept)", "Treatment",  "Post Visible", "Live Q\\&A (AMA)", 
+                                "Weekend", "Post Hour", "Post Hour ^2"),
+          custom.model.names = c("Newcomer Comments Removed", "Newcomer Comment Count")
 )
 
 #### GENERATE CONFIDENCE INTERVALS AND PLOTS
