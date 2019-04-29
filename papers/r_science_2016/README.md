@@ -6,6 +6,9 @@ This folder includes data and code associated with the experiment pre-registered
 * `r_science_comments_science_sticky_09.24.2016.csv`: all comments in the experiment, including randomization blocks removed due to software errors
 * `r_science_posts_2016.07.04_04.45.23-2016.08.01_22.14.00.csv`: pre-experiment observations used in summary statistics for setting the context
 
+This paper has been published by PNAS:
+* Matias, J. Nathan (2019) [Preventing harassment and increasing group participation through social norms in 2,190 online science discussions](https://www.pnas.org/content/early/2019/04/23/1813486116). Proceedings of the National Academy of Sciences Apr 2019, 201813486; DOI: 10.1073/pnas.1813486116 
+
 # R Library versions used in this analysis
 The following is output from the sessionInfo() command in R from the R version and libraries that were used to generate results:
 
