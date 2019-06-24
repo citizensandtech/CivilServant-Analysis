@@ -123,7 +123,10 @@ def construct_rank_vectors(is_subpage):
                 rank_vectors[subid][pt][pid][created_at_utc]["rank"] = i
                 rank_vectors[subid][pt][pid][created_at_utc]["score"] = post["score"]
 
-                age = created_at_utc.timestamp() - post["created_utc"] # time (in seconds) between post creation and snapshot 
+                if "created_utc" not in post.keys():
+                    age = None
+                else: 
+                    age = created_at_utc.timestamp() - post["created_utc"] # time (in seconds) between post creation and snapshot 
                 rank_vectors[subid][pt][pid][created_at_utc]["age_sec"] = age
                 page_ages[page.id].append(age)
 
