@@ -242,7 +242,7 @@ for table in ["SubredditPage", "FrontPage"]:
         for rank in rank_limits:
             for value in ["time", "gap_cutoff", "num_gaps", "sum_gaps"]:
                 labels.append("{0} in {1} {2} {3}".format(value, table, pt.name, rank))
-rows.append(", ".join(labels))
+rows.append(",".join(labels))
 
 
 #janky joining of s_post_to_time and f_post_to_time
@@ -264,7 +264,7 @@ for pid in s_post_to_time:
                     if pid in post_to_time and pt in post_to_time[pid]:
                         cell = str(post_to_time[pid][pt][rank][value])
                     row.append(cell)
-    rows.append(", ".join(row))
+    rows.append(",".join(row))
 
 
 for pid in f_post_to_time:
@@ -283,7 +283,7 @@ for pid in f_post_to_time:
                         if pid in post_to_time and pt in post_to_time[pid]:
                             cell = str(post_to_time[pid][pt][rank][value])
                         row.append(cell)
-    rows.append(", ".join(row))
+    rows.append(",".join(row))
     
 
 with open(OUTPUTPATH, 'w') as f:
