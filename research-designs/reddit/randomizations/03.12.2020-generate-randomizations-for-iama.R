@@ -14,8 +14,10 @@ block.sizes = 2
 
 post.randomizations <- blockrand(n=post.observations, num.levels = arms, block.sizes = c(block.sizes,block.sizes), id.prefix='post', block.prefix='block',stratum='post')
 post.randomizations <- post.randomizations[c('treatment', 'block.id', 'block.size')]
-
 post.randomizations$treatment <- as.numeric(post.randomizations$treatment) - 1
+
+post.randomizations$block.id <- str_replace(post.randomizations$block.id , "block", "")
+summary(factor(post.randomizations$block.id))
 
 write.table(post.randomizations, "outputs/iama.guestbook.post.randomizations.03.12.2020.csv", sep = ",", col.names = NA)
 
