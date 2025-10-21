@@ -1,0 +1,20 @@
+[Source]
+subreddit_id = abcd
+start_time = 2024-09-27 00:00:00
+end_time = 2025-09-20 00:00:00
+
+[Extracted]
+post_file = 2025-10-08-abcd-posts.tsv
+comment_file = 2025-10-08-abcd-comments.tsv
+modaction_file = 2025-10-08-abcd-modactions.tsv
+praw_post_file = 2025-10-11-abcd-praw_posts.tsv
+praw_comment_file = 2025-10-11-abcd-praw_comments.tsv
+
+[Transformed]
+account_file = 2025-10-20-abcd-accounts.tsv
+
+[Sample]
+seed = 1981716121
+post_activity_min = 1
+comment_activity_min = 2
+strata_size = 500
