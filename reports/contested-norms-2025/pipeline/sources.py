@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import pytz
+import time
 from tqdm import tqdm
 
 ### LOAD SQLALCHEMY
@@ -110,31 +111,59 @@ class CivilServantPostSource(CivilServantSource):
         total_posts = self.db().query(Post).filter(filter).count()
         self.logger.info("  Querying {} records".format(total_posts))
         
-        posts = self.db().query(Post).filter(filter)
-        
+        next_start_time = self.start_time
+        total_hours = int(math.ceil((self.end_time - self.start_time).total_seconds() / 3600))
+
         count = 0
-        for post in tqdm(posts, total=total_posts):
-            post_data = json.loads(post.post_data)
-            created_utc = utc.localize(datetime.utcfromtimestamp(post_data['created_utc']))
-            if created_utc > self.end_time:
-                # Becasue an extra day is included at the end of the query,
-                # some records need to be filtered out if created_utc is outside
-                # the observation period
-                continue
-            datum = {
-                "id": post.id,
-                "fullname": post_data['name'],
-                "created.utc": post_data['created_utc'],
-                "created.at": utc.localize(post.created_at).timestamp(),
-                "subreddit.id": post.subreddit_id,
-                "author": post_data['author'],
-                "author.fullname": post_data.get('author_fullname', ''),
-                "selftext": post_data['selftext']
-            }
-            yield datum
-            count += 1
+        skipped = 0
+        progress_start = time.time()
+        progress = tqdm(total=total_hours)
+        last_log = None
+        while next_start_time < self.end_time + timedelta(days=1):
+            start_time = next_start_time
+            next_start_time = start_time + timedelta(hours=1)
+
+            posts = self.db().query(Post).filter(and_(
+                Post.subreddit_id == self.subreddit_id,
+                Post.created_at >= start_time,
+                Post.created_at < next_start_time))
+
+            for post in posts:
+                post_data = json.loads(post.post_data)
+                created_utc = utc.localize(datetime.utcfromtimestamp(post_data['created_utc']))
+                if created_utc > self.end_time:
+                    # Becasue an extra day is included at the end of the query,
+                    # some records need to be filtered out if created_utc is outside
+                    # the observation period
+                    skipped += 1
+                    continue
+                datum = {
+                    "id": post.id,
+                    "fullname": post_data['name'],
+                    "created.utc": post_data['created_utc'],
+                    "created.at": utc.localize(post.created_at).timestamp(),
+                    "subreddit.id": post.subreddit_id,
+                    "author": post_data['author'],
+                    "author.fullname": post_data.get('author_fullname', ''),
+                    "selftext": post_data['selftext']
+                }
+
+                count += 1
+                yield datum
+
+            progress.refresh()
+            progress_time = time.time() - progress_start
+            if (last_log is None
+                or progress_time - last_log > 300
+                or next_start_time >= self.end_time + timedelta(days=1)
+            ):
+                self.logger.debug("    {} complete in {} seconds".format(count, progress_time))
+                last_log = progress_time
+                
+        progress.close()
         self.logger.info("  Done")
         self.logger.info("  Extracted {} rows".format(count))
+        self.logger.info("  Skipped {} outside observation period".format(skipped))
 
 class CivilServantCommentSource(CivilServantSource):
     
@@ -186,33 +215,60 @@ class CivilServantCommentSource(CivilServantSource):
         total_comments = self.db().query(Comment).filter(filter).count()
         self.logger.info("  Querying {} records".format(total_comments))
         
-        comments = self.db().query(Comment).filter(filter)
-        
+        next_start_time = self.start_time
+        total_hours = int(math.ceil((self.end_time - self.start_time).total_seconds() / 3600))
+
         count = 0
-        for comment in tqdm(comments, total=total_comments):
-            comment_data = json.loads(comment.comment_data)
-            created_utc = utc.localize(datetime.utcfromtimestamp(comment_data['created_utc']))
-            if created_utc > self.end_time:
-                # Becasue an extra day is included at the end of the query,
-                # some records need to be filtered out if created_utc is outside
-                # the observation period
-                continue
-            datum = {
-                'id': comment.id,
-                'fullname': comment_data['name'],
-                'created.utc': utc.localize(comment.created_utc).timestamp(),
-                'created.at': utc.localize(comment.created_at).timestamp(),
-                'link.id': comment_data['link_id'],
-                'subreddit.id': comment.subreddit_id,
-                'author': comment_data['author'],
-                'author.fullname': comment_data.get('author_fullname'),
-                'is.submitter': comment_data['is_submitter'],
-                'body': comment_data['body']
-            }
-            yield datum
-            count += 1
+        skipped = 0
+        progress_start = time.time()
+        progress = tqdm(total=total_hours)
+        last_log = None
+        while next_start_time < self.end_time + timedelta(days=1):
+            start_time = next_start_time
+            next_start_time = start_time + timedelta(hours=1)
+
+            comments = self.db().query(Comment).filter(and_(
+                Comment.subreddit_id == self.subreddit_id,
+                Comment.created_at >= start_time,
+                Comment.created_at < next_start_time))
+            
+            for comment in comments:
+                comment_data = json.loads(comment.comment_data)
+                created_utc = utc.localize(datetime.utcfromtimestamp(comment_data['created_utc']))
+                if created_utc > self.end_time:
+                    # Becasue an extra day is included at the end of the query,
+                    # some records need to be filtered out if created_utc is outside
+                    # the observation period
+                    skipped += 1
+                    continue
+                datum = {
+                    'id': comment.id,
+                    'fullname': comment_data['name'],
+                    'created.utc': utc.localize(comment.created_utc).timestamp(),
+                    'created.at': utc.localize(comment.created_at).timestamp(),
+                    'link.id': comment_data['link_id'],
+                    'subreddit.id': comment.subreddit_id,
+                    'author': comment_data['author'],
+                    'author.fullname': comment_data.get('author_fullname'),
+                    'is.submitter': comment_data['is_submitter'],
+                    'body': comment_data['body']
+                }
+                yield datum
+                count += 1
+
+            progress.refresh()
+            progress_time = time.time() - progress_start
+            if (last_log is None
+                or progress_time - last_log > 300
+                or next_start_time >= self.end_time + timedelta(days=1)
+            ):
+                self.logger.debug("    {} complete in {} seconds".format(count, progress_time))
+                last_log = progress_time
+                
+        progress.close()
         self.logger.info("  Done")
         self.logger.info("  Extracted {} rows".format(count))
+        self.logger.info("  Skipped {} outside observation period".format(skipped))
 
 class CivilServantModActionSource(CivilServantSource):
     def __init__(self, *args, **kwargs):
@@ -276,6 +332,8 @@ class CivilServantModActionSource(CivilServantSource):
             total_hours = int(math.ceil((self.end_time - self.start_time).total_seconds() / 3600))
 
             count = 0
+            last_log = None
+            progress_start = time.time()
             progress = tqdm(total=total_hours)
             while next_start_time < self.end_time:
                 start_time = next_start_time
@@ -304,8 +362,17 @@ class CivilServantModActionSource(CivilServantSource):
                     }
                     yield datum
                     count += 1
+                    
                 progress.update()
-            del progress
+                progress_time = time.time() - progress_start
+                if (last_log is None
+                    or progress_time - last_log > 300
+                    or next_start_time >= self.end_time + timedelta(days=1)
+                ):
+                    self.logger.debug("    {} complete in {} seconds".format(count, progress_time))
+                    last_log = progress_time
+                    
+            progress.close()
             self.logger.info("    Extracted {} actions".format(count))
                 
         self.logger.info("  Done")
