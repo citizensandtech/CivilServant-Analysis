@@ -468,6 +468,7 @@ class PRAWCommentSource(DataSource):
         self.things = list(things)
         self.logger = logging.getLogger('CivilServant-Analysis')
         self.delay_s = delay_s
+        self.resume_by_id = None
         
     def label(self):
         return "{}-praw_comments".format(self.subreddit_id)
@@ -499,51 +500,78 @@ class PRAWCommentSource(DataSource):
             'is.submitter': bool,
             'body': str
         }
+
+    def resume(self, rows):
+        self.resume_by_id = dict([(row['id'], row) for row in rows])
         
     def extract(self):
         self.logger.info("Extracting Reddit PRAW comments")
 
+        query_ids = []
+        if self.resume_by_id is None:
+            query_fullnames = self.things
+        else:
+            for thing in self.things:
+                thing_id = thing.replace('t1_', '')
+                if selfthing_id not in self.resume_by_id:
+                    query_fullnames.append(thing)
+            self.logger.info("  Resuming and skipping {} previous rows".format(len(self.things) - len(query_fullnames)))
+        
         count = 0
         skipped = 0
         skipped_subreddit = 0
-        pages = math.ceil(len(self.things) / 100)
+        resumed = 0
+        page_fullnames = []
         progress = tqdm(total=len(self.things))
-        for page in range(pages):
-            page_ids = self.things[page*100:(page+1)*100]
-            response = self.reddit.get_info(thing_id=page_ids)
-            for thing in response:
-                created_utc = utc.localize(datetime.utcfromtimestamp(thing.created_utc))
-                if created_utc < self.start_time or created_utc >= self.end_time:
-                    skipped += 1
-                    continue
-                if thing.subreddit_id.replace('t5_', '') != self.subreddit_id:
-                    skipped_subreddit += 1
-                    continue
-                result = {
-                    'id': thing.id,
-                    'fullname': thing.name,
-                    'created.utc': thing.created_utc,
-                    'created.at': None,
-                    'link.id': thing.link_id,
-                    'subreddit.id': thing.subreddit_id,
-                    'is.submitter': thing.is_submitter,
-                    'body': thing.body
-                }
-                try:
-                    result['author'] = thing.author.name
-                except AttributeError:
-                    result['author'] = None
-                try:
-                    result['author.fullname'] = thing.author.fullname
-                except (AttributeError, NotFound):
-                    result['author.fullname'] = None
-                yield result
-                count += 1
+        for i, thing in enumerate(self.things):
+
+            if thing in query_fullnames:
+                page_fullnames.append(thing)
+            else:
+                thing_id = thing.replace('t1_', '')
+                resumed += 1
                 progress.update()
-                time.sleep(self.delay_s)
+                yield self.resume_by_id[thing_id]
+
+            # If the query page is full or we're out of items, query the API
+            if len(page_fullnames) == 100 or i == len(self.things) - 1:
+                response = self.reddit.get_info(thing_id=page_fullnames)
+                page_fullnames = []
+                for thing in response:
+                    created_utc = utc.localize(datetime.utcfromtimestamp(thing.created_utc))
+                    if created_utc < self.start_time or created_utc >= self.end_time:
+                        skipped += 1
+                        continue
+                    if thing.subreddit_id.replace('t5_', '') != self.subreddit_id:
+                        skipped_subreddit += 1
+                        continue
+                    result = {
+                        'id': thing.id,
+                        'fullname': thing.name,
+                        'created.utc': thing.created_utc,
+                        'created.at': None,
+                        'link.id': thing.link_id,
+                        'subreddit.id': thing.subreddit_id,
+                        'is.submitter': thing.is_submitter,
+                        'body': thing.body
+                    }
+                    try:
+                        result['author'] = thing.author.name
+                    except AttributeError:
+                        result['author'] = None
+                    try:
+                        result['author.fullname'] = thing.author.fullname
+                    except (AttributeError, NotFound):
+                        result['author.fullname'] = None
+                    yield result
+                    count += 1
+                    progress.update()
+                    time.sleep(self.delay_s)
             
         self.logger.info("  Done")
         self.logger.info("  Extracted {} rows".format(count))
+        if self.resume_by_id is not None:
+            self.logger.info("  Re-used {} rows from resumed dataset".format(resumed))
         self.logger.info("  Skipped {} rows out of date range".format(skipped))
         self.logger.info("  Skipped {} rows not matching subreddit_id".format(skipped_subreddit))
         

@@ -63,8 +63,11 @@ class DataFile:
     
     exclude: When reading a file, records will only be included if `exclude(row)`
         is False (default: `None`).
+
+    resume: Filename of partially-finished previous extraction. Already extracted rows will
+        be taken from this file rather than re-extracted.
     """
-    def __init__(self, source, directory=None, filename=None, load=False, exclude=None):
+    def __init__(self, source, directory=None, filename=None, load=False, exclude=None, resume=None):
         self.source = source
         self.filename = filename
         self.logger = logging.getLogger('CivilServant-Analysis')
@@ -79,7 +82,12 @@ class DataFile:
         self.exclude = exclude
         if filename is not None and load:
             self.loaded_rows = list(self._load())
-
+        self.resume = None
+        if resume is not None:
+            self.resume_filename = resume
+            self.resume = DataFile(source=source, directory=directory, filename=resume, load=True)
+            self.source.resume(self.resume.loaded_rows)
+    
     def extract(self, load=False):
         if self.loaded:
             raise RuntimeError("DataFile already loaded, cannot be extracted")
@@ -87,7 +95,10 @@ class DataFile:
         # Open a new file and write each row
         self.filename = "{}-{}.tsv".format(self.script_date, self.source.label())
         self.logger.info("Extracting dataset")
+        if self.resume is not None:
+            self.logger.info("  Resuming extraction from file: {}".format(self.resume_filename))
         self.logger.info("  Opening for writing: {}".format(self.filename))
+                         
         if load:
             self.loaded_rows = []
         with open(os.path.join("extracted", self.filename), 'w', encoding='utf-8') as f:
