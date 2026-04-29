@@ -45,12 +45,18 @@ class CivilServantSource(DataSource):
                  subreddit_id,
                  start_time,
                  end_time,
-                 database_config=None):
+                 database_config=None,
+                 ignore=None
+                ):
         self.subreddit_id = subreddit_id
         self._subreddit_name = None
         self.start_time = start_time
         self.end_time = end_time
         self.database_config = database_config
+        if ignore is None:
+            self.ignore = []
+        else:
+            self.ignore = ignore
         self._db = None
         self.logger = logging.getLogger('CivilServant-Analysis')
 
@@ -72,27 +78,32 @@ class CivilServantPostSource(CivilServantSource):
     
     def columns(self):
         return [
-            "id",
-            "fullname",
-            "created.utc",
-            "created.at",
-            "subreddit.id",
-            "author",
-            "author.fullname",
-            "selftext"
+            field for field in [
+                "id",
+                "fullname",
+                "created.utc",
+                "created.at",
+                "subreddit.id",
+                "author",
+                "author.fullname",
+                "selftext"
+            ]
+            if field not in self.ignore
         ]
 
     def column_types(self):
-        return {
-            "id": str,
-            "fullname": str,
-            "created.utc": float,
-            "created.at": float,
-            "subreddit.id": str,
-            "author": str,
-            "author.fullname": str,
-            "selftext": str
-        }
+        return dict(
+            (field, field_type) for field, field_type in [
+                ("id", str),
+                ("fullname", str),
+                ("created.utc", float),
+                ("created.at", float),
+                ("subreddit.id", str),
+                ("author", str),
+                ("author.fullname", str),
+                ("selftext", str)
+            ]
+        )
 
     def extract(self):
         self.logger.info("Extracting posts")
@@ -137,21 +148,28 @@ class CivilServantPostSource(CivilServantSource):
                     # the observation period
                     skipped += 1
                     continue
-                datum = {
-                    "id": post.id,
-                    "fullname": post_data['name'],
-                    "created.utc": post_data['created_utc'],
-                    "created.at": utc.localize(post.created_at).timestamp(),
-                    "subreddit.id": post.subreddit_id,
-                    "author": post_data['author'],
-                    "author.fullname": post_data.get('author_fullname', ''),
-                    "selftext": post_data['selftext']
-                }
+                datum = {}
+                if 'id' not in self.ignore:
+                    datum['id'] = post.id
+                if 'fullname' not in self.ignore:
+                    datum['fullname'] = post_data['name']
+                if 'created.utc' not in self.ignore:
+                    datum['created.utc'] = post_data['created_utc']
+                if 'created.at' not in self.ignore:
+                    datum['created.at'] = utc.localize(post.created_at).timestamp()
+                if 'subreddit.id' not in self.ignore:
+                    datum['subreddit.id'] = post.subreddit_id
+                if 'author' not in self.ignore:
+                    datum['author'] = post_data['author']
+                if 'author.fullname' not in self.ignore:
+                    datum['author.fullname'] = post_data.get('author_fullname', '')
+                if 'selftext' not in self.ignore:
+                    datum['selftext'] = post_data['selftext']
 
                 count += 1
                 yield datum
 
-            progress.refresh()
+            progress.update()
             progress_time = time.time() - progress_start
             if (last_log is None
                 or progress_time - last_log > 300
@@ -159,6 +177,7 @@ class CivilServantPostSource(CivilServantSource):
             ):
                 self.logger.debug("    {} complete in {} seconds".format(count, progress_time))
                 last_log = progress_time
+                progress.refresh()
                 
         progress.close()
         self.logger.info("  Done")
@@ -172,31 +191,36 @@ class CivilServantCommentSource(CivilServantSource):
 
     def columns(self):
         return [
-            'id',
-            'fullname',
-            'created.utc',
-            'created.at',
-            'link.id',
-            'subreddit.id',
-            'author',
-            'author.fullname',
-            'is.submitter',
-            'body'
+            field for field in [
+                'id',
+                'fullname',
+                'created.utc',
+                'created.at',
+                'link.id',
+                'subreddit.id',
+                'author',
+                'author.fullname',
+                'is.submitter',
+                'body'
+            ]
+            if field not in self.ignore
         ]
     
     def column_types(self):
-        return {
-            'id': str,
-            'fullname': str,
-            'created.utc': float,
-            'created.at': float,
-            'link.id': str,
-            'subreddit.id': str,
-            'author': str,
-            'author.fullname': str,
-            'is.submitter': bool,
-            'body': str
-        }
+        return dict(
+            (field, field_type) for field, field_type in [
+                ('id', str),
+                ('fullname', str),
+                ('created.utc', float),
+                ('created.at', float),
+                ('link.id', str),
+                ('subreddit.id', str),
+                ('author', str),
+                ('author.fullname', str),
+                ('is.submitter', bool),
+                ('body', str)
+            ]
+        )
     
     def extract(self):
         self.logger.info("Extracting comments")
@@ -241,22 +265,32 @@ class CivilServantCommentSource(CivilServantSource):
                     # the observation period
                     skipped += 1
                     continue
-                datum = {
-                    'id': comment.id,
-                    'fullname': comment_data['name'],
-                    'created.utc': utc.localize(comment.created_utc).timestamp(),
-                    'created.at': utc.localize(comment.created_at).timestamp(),
-                    'link.id': comment_data['link_id'],
-                    'subreddit.id': comment.subreddit_id,
-                    'author': comment_data['author'],
-                    'author.fullname': comment_data.get('author_fullname'),
-                    'is.submitter': comment_data['is_submitter'],
-                    'body': comment_data['body']
-                }
+                datum = {}
+                if 'id' not in self.ignore:
+                    datum['id'] = comment.id
+                if 'fullname' not in self.ignore:
+                    datum['fullname'] = comment_data['name']
+                if 'created.utc' not in self.ignore:
+                    datum['created.utc'] = utc.localize(comment.created_utc).timestamp()
+                if 'created.at' not in self.ignore:
+                    datum['created.at'] = utc.localize(comment.created_at).timestamp()
+                if 'link.id' not in self.ignore:
+                    datum['link.id'] = comment_data['link_id']
+                if 'subreddit.id' not in self.ignore:
+                    datum['subreddit.id'] = comment.subreddit_id
+                if 'author' not in self.ignore:
+                    datum['author'] = comment_data['author']
+                if 'author.fullname' not in self.ignore:
+                    datum['author.fullname'] = comment_data.get('author_fullname')
+                if 'is.submitter' not in self.ignore:
+                    datum['is.submitter'] = comment_data['is_submitter']
+                if 'body' not in self.ignore:
+                    datum['body'] = comment_data['body']
+                    
                 yield datum
                 count += 1
 
-            progress.refresh()
+            progress.update()
             progress_time = time.time() - progress_start
             if (last_log is None
                 or progress_time - last_log > 300
@@ -264,6 +298,7 @@ class CivilServantCommentSource(CivilServantSource):
             ):
                 self.logger.debug("    {} complete in {} seconds".format(count, progress_time))
                 last_log = progress_time
+                progress.refresh()
                 
         progress.close()
         self.logger.info("  Done")
