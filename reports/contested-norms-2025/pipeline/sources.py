@@ -103,6 +103,7 @@ class CivilServantPostSource(CivilServantSource):
                 ("author.fullname", str),
                 ("selftext", str)
             ]
+            if field not in self.ignore
         )
 
     def extract(self):
@@ -220,6 +221,7 @@ class CivilServantCommentSource(CivilServantSource):
                 ('is.submitter', bool),
                 ('body', str)
             ]
+            if field not in self.ignore
         )
     
     def extract(self):
@@ -317,6 +319,7 @@ class CivilServantModActionSource(CivilServantSource):
             "banuser",
             "unbanuser"
         ]
+        self.resume_by_action = None
         super().__init__(*args, **kwargs)
         
     def label(self):
@@ -324,35 +327,54 @@ class CivilServantModActionSource(CivilServantSource):
 
     def columns(self):
         return [
-            'id',
-            'created.utc',
-            'created.at',
-            'subreddit.id',
-            'action',
-            'mod',
-            'target.author',
-            'target.fullname',
-            'details',
-            'description'
+            field for field in [
+                'id',
+                'created.utc',
+                'created.at',
+                'subreddit.id',
+                'action',
+                'mod',
+                'target.author',
+                'target.fullname',
+                'details',
+                'description'
+            ]
+            if field not in self.ignore
         ]
 
     def column_types(self):
-        return {
-            'id': str,
-            'created.utc': float,
-            'created.at': float,
-            'subreddit.id': str,
-            'action': str,
-            'mod': str,
-            'target.author': str,
-            'target.fullname': str,
-            'details': str,
-            'description': str
-        }
+        return dict(
+            (field, field_type) for field, field_type in [
+                ('id', str),
+                ('created.utc', float),
+                ('created.at', float),
+                ('subreddit.id', str),
+                ('action', str),
+                ('mod', str),
+                ('target.author', str),
+                ('target.fullname', str),
+                ('details', str),
+                ('description', str)
+            ]
+            if field not in self.ignore
+        )
 
     def set_actions(self, actions):
         self.actions = actions
         return self
+
+    def resume(self, loaded_rows):
+        # Record which actions and ids exist in the data set being resumed
+        completed_actions = []
+        self.resume_by_action = dict()
+        self.completed_ids = set()
+        for row in loaded_rows:
+            self.completed_ids.add(row['id'])
+            action = row['action']
+            if action not in self.resume_by_action:
+                self.resume_by_action[action] = []
+            self.resume_by_action[action].append(row)
+        self.resume_action = loaded_rows[-1]['action']
     
     def extract(self):
         self.logger.info("Extracting mod actions")
@@ -361,12 +383,31 @@ class CivilServantModActionSource(CivilServantSource):
         self.logger.info("  ending: {}".format(self.end_time))
 
         for action in self.actions:
+
             self.logger.info("  Extracting {} actions".format(action))
+            resumed_count = 0
+            last_resumed_time = None
+            
+            # Check whether we are resuming a dataset that extracted any of this action
+            if self.resume_by_action is not None and action in self.resume_by_action:
+                for row in self.resume_by_action[action]:
+                    resumed_count += 1
+                    last_resumed_time = row['created.utc']
+                    yield row
+                self.logger.info("    Used {} records from resumed dataset".format(resumed_count))
+                if action != self.resume_action:
+                    # This action was fully extracted in the resumed dataset
+                    continue
+                else:
+                    # This was the last action extracted in the resumed dataset
+                    # Extraction may not have been complete
+                    pass
 
             next_start_time = self.start_time
             total_hours = int(math.ceil((self.end_time - self.start_time).total_seconds() / 3600))
 
             count = 0
+            duplicate_count = 0
             last_log = None
             progress_start = time.time()
             progress = tqdm(total=total_hours)
@@ -374,6 +415,12 @@ class CivilServantModActionSource(CivilServantSource):
                 start_time = next_start_time
                 next_start_time = start_time + timedelta(hours=1)
 
+                # Check whether we are resuming and this time period has already been extracted
+                if last_resumed_time is not None:
+                    if next_start_time.timestamp() < last_resumed_time:
+                        progress.update()
+                        continue
+                
                 # Unlike posts and comments, created_utc is indexed so can just query on that
                 filter = and_(
                     ModAction.subreddit_id == self.subreddit_id,
@@ -383,20 +430,33 @@ class CivilServantModActionSource(CivilServantSource):
                 modactions = self.db().query(ModAction).filter(filter)
                 for modaction in modactions:
                     action_data = json.loads(modaction.action_data)
-                    datum = {
-                        'id': modaction.id,
-                        'created.utc': utc.localize(modaction.created_utc).timestamp(),
-                        'created.at': utc.localize(modaction.created_at).timestamp(),
-                        'subreddit.id': modaction.subreddit_id,
-                        'action': modaction.action,
-                        'mod': action_data['mod'],
-                        'target.author': modaction.target_author,
-                        'target.fullname': action_data['target_fullname'],
-                        'details': action_data['details'],
-                        'description': action_data['description']
-                    }
-                    yield datum
+                    datum = {}
+                    if 'id' not in self.ignore:
+                        datum['id'] = modaction.id
+                    if 'created.utc' not in self.ignore:
+                        datum['created.utc'] = utc.localize(modaction.created_utc).timestamp()
+                    if 'created.at' not in self.ignore:
+                        datum['created.at'] = utc.localize(modaction.created_at).timestamp()
+                    if 'subreddit.id' not in self.ignore:
+                        datum['subreddit.id'] = modaction.subreddit_id
+                    if 'action' not in self.ignore:
+                        datum['action'] = modaction.action
+                    if 'mod' not in self.ignore:
+                        datum['mod'] = action_data['mod']
+                    if 'target.author' not in self.ignore:
+                        datum['target.author'] = modaction.target_author
+                    if 'target.fullname' not in self.ignore:
+                        datum['target.fullname'] = action_data['target_fullname']
+                    if 'details' not in self.ignore:
+                        datum['details'] = action_data['details']
+                    if 'description' not in self.ignore:
+                        datum['description'] = action_data['description']
+
                     count += 1
+                    if self.resume_by_action is None or datum['id'] not in self.completed_ids:
+                        yield datum
+                    else:
+                        duplicate_count += 1
                     
                 progress.update()
                 progress_time = time.time() - progress_start
@@ -409,11 +469,14 @@ class CivilServantModActionSource(CivilServantSource):
                     
             progress.close()
             self.logger.info("    Extracted {} actions".format(count))
+            if self.resume_by_action is not None:
+                self.logger.info("    Used {} records from resumed dataset".format(resumed_count))
+                self.logger.info("    Ignored {} re-extracted duplicates".format(duplicate_count))
                 
         self.logger.info("  Done")
 
 class PRAWPostSource(DataSource):
-    def __init__(self, subreddit_id, start_time, end_time, reddit=None, things=[], delay_s=2):
+    def __init__(self, subreddit_id, start_time, end_time, reddit=None, things=[], delay_s=2, ignore=None):
         self.start_time = start_time
         self.end_time = end_time
         self.subreddit_id = subreddit_id
@@ -421,33 +484,43 @@ class PRAWPostSource(DataSource):
         self.things = list(things)
         self.logger = logging.getLogger('CivilServant-Analysis')
         self.delay_s = delay_s
+        if ignore is None:
+            self.ignore = []
+        else:
+            self.ignore = ignore
         
     def label(self):
         return "{}-praw_posts".format(self.subreddit_id)
     
     def columns(self):
         return [
-            "id",
-            "fullname",
-            "created.utc",
-            "created.at",
-            "subreddit.id",
-            "author",
-            "author.fullname",
-            "selftext"
+            field for field in [
+                "id",
+                "fullname",
+                "created.utc",
+                "created.at",
+                "subreddit.id",
+                "author",
+                "author.fullname",
+                "selftext"
+            ]
+            if field not in self.ignore
         ]
         
     def column_types(self):
-        return {
-            "id": str,
-            "fullname": str,
-            "created.utc": float,
-            "created.at": float,
-            "subreddit.id": str,
-            "author": str,
-            "author.fullname": str,
-            "selftext": str
-        }
+        return dict(
+            (field, field_type) for field, field_type in [
+                ("id", str),
+                ("fullname", str),
+                ("created.utc", float),
+                ("created.at", float),
+                ("subreddit.id", str),
+                ("author", str),
+                ("author.fullname", str),
+                ("selftext", str)
+            ]
+            if field not in self.ignore
+        )
         
     def extract(self):
         self.logger.info("Extracting Reddit PRAW posts")
@@ -468,22 +541,29 @@ class PRAWPostSource(DataSource):
                 if thing.subreddit_id.replace('t5_', '') != self.subreddit_id:
                     skipped_subreddit += 1
                     continue
-                result = {
-                    'id': thing.id,
-                    'fullname': thing.name,
-                    'created.utc': thing.created_utc,
-                    'created.at': None,
-                    'subreddit.id': thing.subreddit_id,
-                    'selftext': thing.selftext
-                }
-                try:
-                    result['author'] = thing.author.name
-                except AttributeError:
-                    result['author'] = None
-                try:
-                    result['author.fullname'] = thing.author.fullname
-                except (AttributeError, NotFound):
-                    result['author.fullname'] = None
+                result = {}
+                if 'id' not in self.ignore:
+                    result['id'] = thing.id
+                if 'fullname' not in self.ignore:
+                    result['fullname'] = thing.name
+                if 'created.utc' not in self.ignore:
+                    result['created.utc'] = thing.created_utc
+                if 'created.at' not in self.ignore:
+                    result['created.at'] = None,
+                if 'subreddit.id' not in self.ignore:
+                    result['subreddit.id'] = thing.subreddit_id
+                if 'selftext' not in self.ignore:
+                    result['selftext'] = thing.selftext
+                if 'author' not in self.ignore:
+                    try:
+                        result['author'] = thing.author.name
+                    except AttributeError:
+                        result['author'] = None
+                if 'author.fullname' not in self.ignore:
+                    try:
+                        result['author.fullname'] = thing.author.fullname
+                    except (AttributeError, NotFound):
+                        result['author.fullname'] = None
                 yield result
                 count += 1
                 progress.update()
@@ -495,7 +575,7 @@ class PRAWPostSource(DataSource):
         self.logger.info("  Skipped {} rows not matching subreddit_id".format(skipped_subreddit))
 
 class PRAWCommentSource(DataSource):
-    def __init__(self, subreddit_id, start_time, end_time, reddit=None, things=[], delay_s=2):
+    def __init__(self, subreddit_id, start_time, end_time, reddit=None, things=[], delay_s=2, ignore=None):
         self.start_time = start_time
         self.end_time = end_time
         self.subreddit_id = subreddit_id
@@ -504,37 +584,47 @@ class PRAWCommentSource(DataSource):
         self.logger = logging.getLogger('CivilServant-Analysis')
         self.delay_s = delay_s
         self.resume_by_id = None
+        if ignore is None:
+            self.ignore = []
+        else:
+            self.ignore = ignore
         
     def label(self):
         return "{}-praw_comments".format(self.subreddit_id)
     
     def columns(self):
         return [
-            'id',
-            'fullname',
-            'created.utc',
-            'created.at',
-            'link.id',
-            'subreddit.id',
-            'author',
-            'author.fullname',
-            'is.submitter',
-            'body'
+            field for field in [
+                'id',
+                'fullname',
+                'created.utc',
+                'created.at',
+                'link.id',
+                'subreddit.id',
+                'author',
+                'author.fullname',
+                'is.submitter',
+                'body'
+            ]
+            if field not in self.ignore
         ]
         
     def column_types(self):
-        return {
-            'id': str,
-            'fullname': str,
-            'created.utc': float,
-            'created.at': float,
-            'link.id': str,
-            'subreddit.id': str,
-            'author': str,
-            'author.fullname': str,
-            'is.submitter': bool,
-            'body': str
-        }
+        return dict(
+            (field, field_type) for field, field_type in [
+                ('id', str),
+                ('fullname', str),
+                ('created.utc', float),
+                ('created.at', float),
+                ('link.id', str),
+                ('subreddit.id', str),
+                ('author', str),
+                ('author.fullname', str),
+                ('is.submitter', bool),
+                ('body', str)
+            ]
+            if field not in self.ignore
+        )
 
     def resume(self, rows):
         self.resume_by_id = dict([(row['id'], row) for row in rows])
@@ -580,24 +670,33 @@ class PRAWCommentSource(DataSource):
                     if thing.subreddit_id.replace('t5_', '') != self.subreddit_id:
                         skipped_subreddit += 1
                         continue
-                    result = {
-                        'id': thing.id,
-                        'fullname': thing.name,
-                        'created.utc': thing.created_utc,
-                        'created.at': None,
-                        'link.id': thing.link_id,
-                        'subreddit.id': thing.subreddit_id,
-                        'is.submitter': thing.is_submitter,
-                        'body': thing.body
-                    }
-                    try:
-                        result['author'] = thing.author.name
-                    except AttributeError:
-                        result['author'] = None
-                    try:
-                        result['author.fullname'] = thing.author.fullname
-                    except (AttributeError, NotFound):
-                        result['author.fullname'] = None
+                    result = {}
+                    if 'id' not in self.ignore:
+                        result['id'] = thing.id
+                    if 'fullname' not in self.ignore:
+                        result['fullname'] = thing.name
+                    if 'created.utc' not in self.ignore:
+                        result['created.utc'] = thing.created_utc
+                    if 'created.at' not in self.ignore:
+                        result['created.at'] = None
+                    if 'link.id' not in self.ignore:
+                        result['link.id'] = thing.link_id
+                    if 'subreddit.id' not in self.ignore:
+                        result['subreddit.id'] = thing.subreddit_id
+                    if 'is.submitter' not in self.ignore:
+                        result['is.submitter'] = thing.is_submitter
+                    if 'body' not in self.ignore:
+                        result['body'] = thing.body
+                    if 'author' not in self.ignore:
+                        try:
+                            result['author'] = thing.author.name
+                        except AttributeError:
+                            result['author'] = None
+                    if 'author.fullname' not in self.ignore:
+                        try:
+                            result['author.fullname'] = thing.author.fullname
+                        except (AttributeError, NotFound):
+                            result['author.fullname'] = None
                     yield result
                     count += 1
                     progress.update()

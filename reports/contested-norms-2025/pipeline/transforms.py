@@ -10,7 +10,7 @@ utc = pytz.UTC
 
 re_temporary = re.compile(r'^(\d+) day')
 re_permanent = re.compile(r'^permanent$')
-re_changed_temporary = re.compile(r'^Ban changed to (\d+) day')
+re_changed_temporary = re.compile(r'^(?:Ban )?changed to (\d+) day')
 re_changed_permanent = re.compile(r'^changed to permanent')
 
 class CivilServantTransformToAccounts:
@@ -243,13 +243,23 @@ class CivilServantTransformToAccounts:
                 elif re.match(re_temporary, details):
                     self.bans_by_user[author].append('temporary')
                 elif re.match(re_changed_permanent, details):
-                    if self.bans_by_user[author][-1] == 'temporary':
-                        self.bans_by_user[-1] = 'permanent'
+                    # This is a change, the most recent ban is updated rather than adding a new one
+                    try:
+                        if self.bans_by_user[author][-1] == 'temporary':
+                            self.bans_by_user[-1] = 'permanent'
+                    except IndexError:
+                        self.logger.warning("Ban type changed to permanent, but not seen previously: {} {}".format(modaction['target.author'], str(modaction['created.utc'])))
+                        self.bans_by_user[author].append('permanent')
                 elif re.match(re_changed_temporary, details):
-                    if self.bans_by_user[author][-1] == 'permanent':
-                        self.bans_by_user[-1] = 'temporary'
+                    # This is a change, the most recent ban is updated rather than adding a new one
+                    try:
+                        if self.bans_by_user[author][-1] == 'permanent':
+                            self.bans_by_user[-1] = 'temporary'
+                    except IndexError:
+                        self.logger.warning("Ban type changed to temporary, but not seen previously: {}".format(str(modaction['created.utc'])))
+                        self.bans_by_user[author].append('temporary')
                 else:
-                    raise Exception("Unknown details in banuser")
+                    raise Exception("Unknown details in banuser: {}".format(details))
 
     def make_username(self):
         self.logger.info ("Creating username")
@@ -526,9 +536,14 @@ class CivilServantTransformToAccounts:
 
     def make_is_currently_suspended(self):
         self.logger.info("Creating is.currently.suspended")
+
+        # Permanent suspensions
         banned = set()
+
+        # End datetime of temporary suspsensions
         suspension_ends = {}
 
+        # Find the end datetime of the most recent ban for each account
         for modaction in self.modactions:
             details = modaction['details']
             author = modaction['target.author']
@@ -543,12 +558,19 @@ class CivilServantTransformToAccounts:
                     ends = created_utc + 60*60*24*float(days)
                     suspension_ends[author] = ends
                 elif re.match(re_changed_temporary, details):
-                    banned.remove(author)
                     days = re.match(re_changed_temporary, details).groups()[0]
+                    if author in banned:
+                        banned.remove(author)
+                    elif author not in suspension_ends:
+                        self.logger.warning(
+                            "Ban changed to {} days with no previous ban: {} {}".format(
+                                days,
+                                modaction['target.author'],
+                                modaction['created.utc']))
                     ends = created_utc + 60*60*24*float(days)
                     suspension_ends[author] = ends
                 else:
-                    raise Exception("Unknown details in banuser")
+                    raise Exception("Unknown details in banuser: {}".format(details))
             elif modaction['action'] == 'unbanuser':
                 if author in banned:
                     banned.remove(author)
