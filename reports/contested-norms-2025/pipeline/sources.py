@@ -632,13 +632,13 @@ class PRAWCommentSource(DataSource):
     def extract(self):
         self.logger.info("Extracting Reddit PRAW comments")
 
-        query_ids = []
+        query_fullnames = []
         if self.resume_by_id is None:
             query_fullnames = self.things
         else:
             for thing in self.things:
                 thing_id = thing.replace('t1_', '')
-                if selfthing_id not in self.resume_by_id:
+                if thing_id not in self.resume_by_id:
                     query_fullnames.append(thing)
             self.logger.info("  Resuming and skipping {} previous rows".format(len(self.things) - len(query_fullnames)))
         
@@ -666,9 +666,11 @@ class PRAWCommentSource(DataSource):
                     created_utc = utc.localize(datetime.utcfromtimestamp(thing.created_utc))
                     if created_utc < self.start_time or created_utc >= self.end_time:
                         skipped += 1
+                        progress.update()
                         continue
                     if thing.subreddit_id.replace('t5_', '') != self.subreddit_id:
                         skipped_subreddit += 1
+                        progress.update()
                         continue
                     result = {}
                     if 'id' not in self.ignore:
@@ -701,7 +703,8 @@ class PRAWCommentSource(DataSource):
                     count += 1
                     progress.update()
                     time.sleep(self.delay_s)
-            
+
+        progress.refresh()
         self.logger.info("  Done")
         self.logger.info("  Extracted {} rows".format(count))
         if self.resume_by_id is not None:
