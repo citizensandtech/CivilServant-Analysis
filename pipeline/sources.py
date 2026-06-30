@@ -16,7 +16,7 @@ import sqlalchemy.orm.session
 
 ### LOAD CIVILSERVANT
 try:
-    from app.models import Post, Comment, ModAction, Subreddit
+    from app.models import Comment, FrontPage, ModAction, Post, Subreddit
 except ImportError:
     pass
 
@@ -25,7 +25,10 @@ import configparser
 import time
 import pickle
 import praw
-from praw.errors import NotFound
+try:
+    from praw.errors import NotFound
+except ModuleNotFoundError:
+    from prawcore.exceptions import NotFound
 
 utc = pytz.UTC
 
@@ -86,6 +89,7 @@ class CivilServantPostSource(CivilServantSource):
                 "subreddit.id",
                 "author",
                 "author.fullname",
+                "link.flair.text",
                 "selftext"
             ]
             if field not in self.ignore
@@ -101,6 +105,7 @@ class CivilServantPostSource(CivilServantSource):
                 ("subreddit.id", str),
                 ("author", str),
                 ("author.fullname", str),
+                ("link.flair.text", str),
                 ("selftext", str)
             ]
             if field not in self.ignore
@@ -164,6 +169,8 @@ class CivilServantPostSource(CivilServantSource):
                     datum['author'] = post_data['author']
                 if 'author.fullname' not in self.ignore:
                     datum['author.fullname'] = post_data.get('author_fullname', '')
+                if 'link.flair.text' not in self.ignore:
+                    datum['link.flair.text'] = post_data.get('link_flair_text', '')
                 if 'selftext' not in self.ignore:
                     datum['selftext'] = post_data['selftext']
 
@@ -198,6 +205,7 @@ class CivilServantCommentSource(CivilServantSource):
                 'created.utc',
                 'created.at',
                 'link.id',
+                'parent.id',
                 'subreddit.id',
                 'author',
                 'author.fullname',
@@ -215,6 +223,7 @@ class CivilServantCommentSource(CivilServantSource):
                 ('created.utc', float),
                 ('created.at', float),
                 ('link.id', str),
+                ('parent.id', str),
                 ('subreddit.id', str),
                 ('author', str),
                 ('author.fullname', str),
@@ -474,6 +483,102 @@ class CivilServantModActionSource(CivilServantSource):
                 self.logger.info("    Ignored {} re-extracted duplicates".format(duplicate_count))
                 
         self.logger.info("  Done")
+
+class CivilServantFrontPageSource(CivilServantSource):
+    def label(self):
+        return "{}-front_pages".format(self.subreddit_id)
+    
+    def columns(self):
+        return [
+            field for field in [
+                "id",
+                "post.id",
+                "created.at",
+                "subreddit",
+                "page.type",
+                "post.rank",
+            ]
+            if field not in self.ignore
+        ]
+
+    def column_types(self):
+        return dict(
+            (field, field_type) for field, field_type in [
+                ("id", str),
+                ("post.id", str),
+                ("created.at", float),
+                ("subreddit", str),
+                ("page.type", int),
+                ("post.rank", int)
+            ]
+            if field not in self.ignore
+        )
+
+    def extract(self):
+        self.logger.info("Extracting front page posts")
+        self.logger.info("  subreddit_id: {}".format(self.subreddit_id))
+        self.logger.info("  starting: {}".format(self.start_time))
+        self.logger.info("  ending: {}".format(self.end_time))
+
+        filter = and_(
+            FrontPage.created_at >= self.start_time,
+            FrontPage.created_at < self.end_time)
+
+        total = self.db().query(FrontPage).filter(filter).count()
+        self.logger.info("  Querying {} records".format(total))
+        
+        next_start_time = self.start_time
+        total_hours = int(math.ceil((self.end_time - self.start_time).total_seconds() / 3600))
+
+        count = 0
+        skipped = 0
+        progress_start = time.time()
+        progress = tqdm(total=total_hours)
+        last_log = None
+        while next_start_time < self.end_time:
+            start_time = next_start_time
+            next_start_time = min(start_time + timedelta(hours=1), self.end_time)
+
+            pages = self.db().query(FrontPage).filter(and_(
+                FrontPage.created_at >= start_time,
+                FrontPage.created_at < next_start_time))
+
+            for page in pages:
+                page_data = json.loads(page.page_data)
+                for rank, page_post in enumerate(page_data):
+                    post = self.db().query(Post).filter(Post.id == page_post['id']).first()
+                    if post is None or post.subreddit_id != self.subreddit_id:
+                        continue
+                    datum = {}
+                    if 'id' not in self.ignore:
+                        datum['id'] = page.id
+                    if 'post.id' not in self.ignore:
+                        datum['post.id'] = page_post['id']
+                    if 'created.at' not in self.ignore:
+                        datum['created.at'] = utc.localize(page.created_at).timestamp()
+                    if 'subreddit' not in self.ignore:
+                        datum['subreddit'] = post.subreddit_id
+                    if 'post.rank' not in self.ignore:
+                        datum['post.rank'] = rank
+                    if 'page.type' not in self.ignore:
+                        datum['page.type'] = page.page_type
+                    count += 1
+                    yield datum
+
+            progress.update()
+            progress_time = time.time() - progress_start
+            if (last_log is None
+                or progress_time - last_log > 300
+                or next_start_time >= self.end_time + timedelta(days=1)
+            ):
+                self.logger.debug("    {} complete in {} seconds".format(count, progress_time))
+                last_log = progress_time
+                progress.refresh()
+                
+        progress.close()
+        self.logger.info("  Done")
+        self.logger.info("  Extracted {} rows".format(count))
+        self.logger.info("  Skipped {} outside observation period".format(skipped))
 
 class PRAWPostSource(DataSource):
     def __init__(self, subreddit_id, start_time, end_time, reddit=None, things=[], delay_s=2, ignore=None):
