@@ -48,6 +48,7 @@ class CivilServantSource(DataSource):
                  subreddit_id,
                  start_time,
                  end_time,
+                 prefix=None,
                  database_config=None,
                  ignore=None
                 ):
@@ -56,6 +57,7 @@ class CivilServantSource(DataSource):
         self.start_time = start_time
         self.end_time = end_time
         self.database_config = database_config
+        self.prefix = prefix
         if ignore is None:
             self.ignore = []
         else:
@@ -77,7 +79,12 @@ class CivilServantSource(DataSource):
 
 class CivilServantPostSource(CivilServantSource):
     def label(self):
-        return "{}-posts".format(self.subreddit_id)
+        parts = []
+        parts.append(self.subreddit_id)
+        if self.prefix is not None:
+            parts.append("prefix")
+        parts.append("posts")
+        return "-".join(parts)
     
     def columns(self):
         return [
@@ -195,7 +202,12 @@ class CivilServantPostSource(CivilServantSource):
 class CivilServantCommentSource(CivilServantSource):
     
     def label(self):
-        return "{}-comments".format(self.subreddit_id)
+        parts = []
+        parts.append(self.subreddit_id)
+        if self.prefix is not None:
+            parts.append("prefix")
+        parts.append("comments")
+        return "-".join(parts)
 
     def columns(self):
         return [
@@ -287,6 +299,8 @@ class CivilServantCommentSource(CivilServantSource):
                     datum['created.at'] = utc.localize(comment.created_at).timestamp()
                 if 'link.id' not in self.ignore:
                     datum['link.id'] = comment_data['link_id']
+                if 'parent.id' not in self.ignore:
+                    datum['parent.id'] = comment_data['parent_id']
                 if 'subreddit.id' not in self.ignore:
                     datum['subreddit.id'] = comment.subreddit_id
                 if 'author' not in self.ignore:
