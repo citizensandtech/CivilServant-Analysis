@@ -175,6 +175,8 @@ class DataFile:
                 count += 1
                 typed_row = {}
                 for column, type in self.source.column_types().items():
+                    if column in self.source.ignore:
+                        continue
                     try:
                         typed_row[column] = type(row[column])
                     except ValueError as err:
