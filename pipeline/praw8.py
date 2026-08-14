@@ -96,9 +96,10 @@ class PRAWPostSource(DataSource):
         self.end_time = end_time
         self.subreddit_id = subreddit_id
         self.reddit = reddit
-        self.things = list(things)
+        self.things = sorted(list(things))
         self.logger = logging.getLogger('CivilServant-Analysis')
         self.delay_s = delay_s
+        self.resume_by_id = None
         if ignore is None:
             self.ignore = []
         else:
@@ -137,62 +138,93 @@ class PRAWPostSource(DataSource):
             if field not in self.ignore
         )
         
+    def resume(self, rows):
+        self.resume_by_id = dict([(row['id'], row) for row in rows])
+        
     def extract(self):
         self.logger.info("Extracting Reddit PRAW posts")
 
+        query_fullnames = []
+        if self.resume_by_id is None:
+            query_fullnames = self.things
+            self.logger.info("  Beginning new extraction of {} rows".format(len(query_fullnames)))
+        else:
+            for thing in self.things:
+                thing_id = thing.replace('t3_', '')
+                if thing_id not in self.resume_by_id:
+                    query_fullnames.append(thing)
+            self.logger.info("  Resuming and skipping {} previous rows".format(len(self.things) - len(query_fullnames)))
+            
         count = 0
         skipped = 0
         skipped_subreddit = 0
-        pages = math.ceil(len(self.things) / 100)
+        resumed = 0
         progress = tqdm(total=len(self.things))
-        for page in range(pages):
-            page_ids = self.things[page*100:(page+1)*100]
-            response = self.reddit.info(fullnames=page_ids)
-            for thing in response:
-                created_utc = utc.localize(datetime.utcfromtimestamp(thing.created_utc))
-                if created_utc < self.start_time or created_utc >= self.end_time:
-                    skipped += 1
-                    progress.update()
-                    continue
-                if thing.subreddit_id.replace('t5_', '') != self.subreddit_id:
-                    skipped_subreddit += 1
-                    progress.update()
-                    continue
-                result = {}
-                if 'id' not in self.ignore:
-                    result['id'] = thing.id
-                if 'fullname' not in self.ignore:
-                    result['fullname'] = thing.name
-                if 'created.utc' not in self.ignore:
-                    result['created.utc'] = thing.created_utc
-                if 'created.at' not in self.ignore:
-                    result['created.at'] = None
-                if 'subreddit.id' not in self.ignore:
-                    result['subreddit.id'] = thing.subreddit_id
-                if 'selftext' not in self.ignore:
-                    if thing.selftext == "[removed]":
-                        result['selftext'] = None
-                    else:
-                        result['selftext'] = thing.selftext
-                if 'author' not in self.ignore:
-                    try:
-                        result['author'] = thing.author.name
-                    except AttributeError:
-                        result['author'] = None
-                if 'author.fullname' not in self.ignore:
-                    try:
-                        result['author.fullname'] = thing.author.fullname
-                    except (AttributeError, NotFound):
-                        result['author.fullname'] = None
-                yield result
-                count += 1
+
+        page_fullnames = []
+        for i, thing in enumerate(self.things):
+            if thing in query_fullnames:
+                page_fullnames.append(thing)
+            else:
+                print(i)
+                assert(False)
+                thing_id = thing.replace('t3_', '')
+                resumed += 1
                 progress.update()
-            progress.refresh()
-            time.sleep(self.delay_s)
+                progress.refresh()
+                yield self.resume_by_id[thing_id]
+
+            # If the query page is full or we're out of items, query the API
+            if len(page_fullnames) == 100 or i == len(self.things) - 1:
+                response = self.reddit.info(fullnames=page_fullnames)
+                page_fullnames = []
+                for thing in response:
+                    created_utc = utc.localize(datetime.utcfromtimestamp(thing.created_utc))
+                    if created_utc < self.start_time or created_utc >= self.end_time:
+                        skipped += 1
+                        progress.update()
+                        continue
+                    if thing.subreddit_id.replace('t5_', '') != self.subreddit_id:
+                        skipped_subreddit += 1
+                        progress.update()
+                        continue
+                    result = {}
+                    if 'id' not in self.ignore:
+                        result['id'] = thing.id
+                    if 'fullname' not in self.ignore:
+                        result['fullname'] = thing.name
+                    if 'created.utc' not in self.ignore:
+                        result['created.utc'] = thing.created_utc
+                    if 'created.at' not in self.ignore:
+                        result['created.at'] = None
+                    if 'subreddit.id' not in self.ignore:
+                        result['subreddit.id'] = thing.subreddit_id
+                    if 'selftext' not in self.ignore:
+                        if thing.selftext == "[removed]":
+                            result['selftext'] = None
+                        else:
+                            result['selftext'] = thing.selftext
+                    if 'author' not in self.ignore:
+                        try:
+                            result['author'] = thing.author.name
+                        except AttributeError:
+                            result['author'] = None
+                    if 'author.fullname' not in self.ignore:
+                        try:
+                            result['author.fullname'] = thing.author.fullname
+                        except (AttributeError, NotFound):
+                            result['author.fullname'] = None
+                    count += 1
+                    progress.update()
+                    yield result
+                time.sleep(self.delay_s)
+                progress.refresh()
 
         progress.refresh()
         self.logger.info("  Done")
         self.logger.info("  Extracted {} rows".format(count))
+        if self.resume_by_id is not None:
+            self.logger.info("  Re-used {} rows from resumed dataset".format(resumed))
         self.logger.info("  Skipped {} rows out of date range".format(skipped))
         self.logger.info("  Skipped {} rows not matching subreddit_id".format(skipped_subreddit))
 
@@ -202,7 +234,7 @@ class PRAWCommentSource(DataSource):
         self.end_time = end_time
         self.subreddit_id = subreddit_id
         self.reddit = reddit
-        self.things = list(things)
+        self.things = sorted(list(things))
         self.logger = logging.getLogger('CivilServant-Analysis')
         self.delay_s = delay_s
         self.resume_by_id = None
